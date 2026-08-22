@@ -1,0 +1,70 @@
+---
+description: Urban Smiles visual design tokens — color, typography, layout, shape
+alwaysApply: true
+---
+
+# Design system
+
+Tailwind v4. Tokens are defined in `src/app/globals.css` under `@theme`. Always use the token utilities below — never raw hex, and never Tailwind's default palette (no `bg-slate-800`, `text-gray-500`, `border-zinc-200`).
+
+## Color
+
+| Token | Hex | Use |
+| --- | --- | --- |
+| `cream` | `#fbfaf8` | page background; text on teal |
+| `sand` | `#f1ede7` | alternating section background |
+| `ink` | `#0f2a26` | headings and primary text |
+| `muted` | `#5a6b67` | secondary body copy |
+| `teal` | `#0e5d52` | primary actions, eyebrows, icons |
+| `teal-dark` | `#0a4a41` | hover state for teal |
+| `mint` | `#cfe9e1` | icon chips, soft accents |
+| `gold` | `#a07a1e` | rating stars only (3.8:1 on cream — do not lighten) |
+
+- At most one solid teal button per viewport; everything else is outline or text.
+- Dividers use `border-ink/10`; card hairlines use `ring-1 ring-ink/10`.
+- De-emphasize with opacity modifiers (`text-ink/80`, `bg-teal/40`) instead of introducing new colors.
+
+## Typography
+
+- `font-display` (Fraunces) for h1–h3 and pull quotes. `font-sans` (Inter) for everything else.
+- **Case:** page-level h1 is sentence case, so it reads fast. Section h2/h3 and eyebrows are uppercase via the `uppercase` class, and their markup stays in sentence case so screen readers and search engines get natural text.
+- **Tracking follows case.** Sentence case gets `tracking-tight`; uppercase gets `tracking-[0.01em]` — never negative tracking on caps, they need the extra room.
+- Scale: h1 `text-4xl sm:text-5xl lg:text-6xl`, h2 `text-3xl sm:text-4xl lg:text-5xl`, card h3 `text-xl`.
+- Headings pair with `font-semibold` and tight leading (`leading-[1.05]` / `leading-[1.1]`).
+- Any figure — ratings, counts, prices, times — gets `tabular-nums`.
+- Section eyebrow: `text-xs font-semibold tracking-[0.28em] text-teal uppercase`, preceded by `<span aria-hidden="true" className="h-px w-8 bg-teal/40" />`.
+- Body copy: `leading-relaxed text-muted`. Hero-level subheadlines: `text-lg sm:text-xl text-ink/80`.
+
+## Layout and shape
+
+- Section shell: `mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:py-28`.
+- Any section targeted by a nav anchor needs an `id`. The header clearance comes from `scroll-padding-top: var(--header-height)` on `html`, which the browser applies to anchor jumps, `scrollIntoView`, and snap alignment alike. The same token drives hero height and desktop sticky offsets.
+- Never add `scroll-mt-*` to a section. `scroll-margin` and the container's `scroll-padding` **add up**, so it double-offsets the target and — worse — pushes an anchor landing away from the section's own snap point, which makes the page snap again right after the jump.
+- Alternate `bg-cream` and `bg-sand/40`; give the tinted ones `border-y border-ink/10`.
+- Radii: `rounded-full` for buttons and chips, `rounded-2xl` for cards, `rounded-[2rem]` for large feature panels.
+- Shadows are rare and soft: `shadow-lg shadow-ink/5` on hover cards, `shadow-xl` on floating chips.
+- Prefer asymmetric two-column grids (`lg:grid-cols-[1.05fr_0.95fr]`) over even 50/50 splits.
+- Alternate which side the visual sits on from section to section so the page has rhythm.
+
+## Responsive behavior
+
+- Design from 320px upward. Use `px-4` at the narrowest width and restore `px-6` at `sm`.
+- All tap targets are at least 44×44px. Mobile form controls use `text-base` to prevent iOS input zoom and may return to `text-sm` at `sm`.
+- The main navigation remains available below `lg` through the mobile menu. The emergency `tel:` strip stays visible at every width.
+- On service pages, the pricing and booking card precedes long treatment content below `lg`; at `lg` it becomes the right-hand sticky column.
+- Disable decorative parallax below `md`. Staff captions stay in normal document flow below `sm`, then may overlap the image at larger widths.
+- Mobile dialogs use dynamic viewport units, account for the bottom safe-area inset, contain overscroll, and keep their close button at least 44×44px.
+
+## Conversion rules for the hero
+
+- Keep the primary CTA high: hero padding is `pt-12 pb-20 lg:pt-16 lg:pb-28`, not a symmetric `py-28`.
+- The CTA gets the largest gap on the page above it (`mt-8`–`mt-10`); isolation is what marks it as primary.
+- State each proof point once. Social proof sits immediately above the CTA, not repeated in a floating card.
+- Every CTA carries risk-reducing microcopy beneath it (effort, cost, or availability).
+- The emergency hotline is a `tel:` link visible at every breakpoint.
+
+## Imagery
+
+- Use `next/image` with explicit `sizes`. The hero image is the LCP element and must set `priority`.
+- Check the source resolution against the rendered slot before choosing a crop — never upscale a photo into a larger frame.
+- Photos of named staff carry a caption with name and credential, inside a `<figure>`/`<figcaption>`.

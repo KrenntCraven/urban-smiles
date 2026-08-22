@@ -1,0 +1,71 @@
+---
+description: Component structure, button/card patterns, icons, and accessibility for UI code
+alwaysApply: true
+---
+
+# UI patterns
+
+## Structure
+
+- Server Components by default. Add `"use client"` only for real interactivity (tabs, accordions, modal, form state).
+- Page sections live in `src/components/sections/<name>.tsx` with a named export matching the section: `export function Hero()`. Shared chrome (header, footer) sits directly in `src/components/`.
+- `src/app/page.tsx` just imports and composes sections in IA order.
+- Declare repeated content (nav links, trust points, values) as a typed array at the top of the file, then map over it. Do not hand-write near-duplicate JSX blocks.
+
+## Buttons
+
+Primary:
+
+```tsx
+className="inline-flex items-center justify-center rounded-full bg-teal px-7 py-3.5 text-base font-semibold text-cream shadow-lg shadow-teal/20 transition-colors hover:bg-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+```
+
+Secondary (outline):
+
+```tsx
+className="inline-flex items-center justify-center gap-2 rounded-full border border-ink/20 px-7 py-3.5 text-base font-semibold text-ink transition-colors hover:border-teal hover:text-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+```
+
+Every interactive element keeps the `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal` ring. Internal navigation uses `next/link`; `tel:` and `mailto:` use a plain `<a>`.
+
+Links to a home-page section are written `/#services`, never `#services`. A bare fragment resolves against the current URL, so anything rendered in shared chrome silently dead-ends on `/services/[slug]` and `/book`. Add a nav entry only once its target section exists.
+
+The desktop nav hides below `lg`, but the same links remain available through `MobileNavigation`. Its button exposes `aria-expanded`/`aria-controls`, links close the menu, outside clicks dismiss it, and Escape closes it while restoring focus.
+
+## Cards
+
+`rounded-2xl bg-cream p-6 sm:p-8 ring-1 ring-ink/10`, optionally `transition-shadow hover:shadow-lg hover:shadow-ink/5`.
+
+## Motion
+
+- Parallax is reserved for decorative layers, imagery, and floating proof cards. Never move headings, body copy, forms, or CTAs.
+- Add `data-parallax` and a conservative `data-parallax-distance` (16–48 pixels). The single controller in the root layout handles scroll work through `requestAnimationFrame`.
+- Parallax uses transforms only, never layout properties, and is disabled below `md` and by `prefers-reduced-motion`.
+- Overscan moving images inside an `overflow-hidden` frame so motion never exposes an empty edge.
+- Snapping belongs to the compositor: `scroll-snap-type: y proximity` on `html` plus `snap-start` on each `ScrollPanel`. Never reimplement it in JS — settling after the browser's momentum ends produces a visible stop-then-move jump, and cancelling on `wheel` freezes the page mid-animation.
+- Use `proximity`, never `mandatory`; sections taller than the viewport must stay freely scrollable.
+- Snap only top-level reading landmarks — the home sections, and `#overview`/`#procedure`/`#faqs`/`#related` from `md` upward on a service page. Service landmarks use `snap-none md:snap-start` so tall phone layouts never tug while the reader is mid-section. Cards, list items, and anything inside the booking form stay unsnapped.
+- The snap area must not be transformed. On the home page the transform-free `ScrollPanel` wrapper carries `snap-start` and the reveal sits on its inner element; service pages carry `snap-start` on the plain section, which is why they get no reveal.
+- Do not pull `ScrollPanel` into statically rendered routes just for polish — it is a client component and drags Framer Motion into a bundle that otherwise ships almost no JS.
+- Reveals use `whileInView` with `once: true` and a low `amount` (≈0.15). A threshold a tall section can never reach would hide it permanently. The hidden state is serialised into the SSR HTML, so `@media (scripting: none)` restores it.
+- Disable snapping and reveals under `prefers-reduced-motion`.
+
+## Icons
+
+Inline SVG only — do not add an icon library. Use a 24×24 `viewBox`, `fill="none" stroke="currentColor" strokeWidth="1.6"`, rounded caps/joins, `aria-hidden="true"`, and `className="size-6"`. As a feature chip, wrap in `flex size-12 items-center justify-center rounded-full bg-mint text-teal`.
+
+## Forms and server actions
+
+- One Zod schema per concern in `src/lib/<domain>/schema.ts` is the single source of truth. Validate on the server in the action; browser attributes like `min` are convenience only and must never be the sole guard.
+- Forms use `useActionState` with a server action so they still submit without JS. Return typed field errors keyed by schema field rather than throwing.
+- A `"use server"` module may only export async functions. Put shared state objects and types in a sibling module (see `src/lib/booking/form-state.ts`) or the client receives `undefined` at runtime.
+- Query-string schemas make each field independently recoverable with `.catch(undefined)`, so one malformed param cannot discard the rest.
+- Inputs use `rounded-xl border border-ink/15 bg-cream px-4 py-2.5 text-sm`, with `aria-invalid` and `aria-describedby` wired to the error element.
+- Never render a value derived from `new Date()` during SSR; apply it to the DOM in an effect instead.
+
+## Semantics and accessibility
+
+- Repeated items use `<ul>`/`<li>`; label-and-value pairs use `<dl>`/`<dt>`/`<dd>`.
+- Decorative blobs, dot grids, and arrows get `aria-hidden="true"` (plus `pointer-events-none` on absolutely positioned decoration).
+- Star ratings: wrapper gets `role="img"` and a descriptive `aria-label`; the individual stars are `aria-hidden`.
+- Nav landmarks need labels, e.g. `<nav aria-label="Main">`.

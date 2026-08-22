@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="9 9 46 46" role="img" aria-label="Urban Smiles">
+  <style>
+    .mark { fill: #0D9488; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #14B8A6; }
+    }
+  </style>
+  <path class="mark" d="M13 17A5 5 0 0 1 23 17L23 30C23 41 41 41 41 30L41 17A5 5 0 0 1 51 17L51 33A19 19 0 0 1 13 33Z" />
+</svg>

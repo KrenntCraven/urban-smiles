@@ -1,0 +1,35 @@
+---
+description: Information architecture for the dental marketing site and booking UX
+alwaysApply: true
+---
+
+# Dental site information architecture
+
+This is a dental web application. Prefer a marketing-first single-page home plus dedicated service detail routes. Do not split home sections into separate pages unless the user asks.
+
+## Home (`/`): interactive single-page scroll
+
+Implement as one scrollable page. Section order is fixed:
+
+1. **Hero / Quick Book floating widget** — primary CTA; widget stays reachable while scrolling (sticky/floating).
+2. **Trust bar** — reviews highlights and emergency hotline.
+3. **About & Why Choose Us** — tabbed or toggle view (not two long stacked essays).
+4. **Interactive services showcase** — cards/tiles that deep-link to `/services/[slug]`.
+5. **Meet the dentists** — expandable bios (collapsed by default).
+6. **Patient reviews & before/after gallery**.
+7. **Embedded quick appointment form** — full booking form in-page (in addition to the floating widget).
+
+## Service detail (`/services/[slug]`)
+
+Each showcase item opens this route. Required blocks:
+
+- Detailed treatment overview
+- Step-by-step procedure guide
+- Pricing, duration, and FAQs
+- CTA **Book This Service** — opens the booking modal or `/book` with that service pre-selected (slug, name, and any default duration). Do not dump the user on a blank form.
+
+## Booking consistency
+
+- Hero widget, home embedded form, and service CTA share the same booking data model and validation.
+- Prefill from the service slug; user can still change the service.
+- Emergency hotline is always visible in the trust bar and must not be buried in the footer only.

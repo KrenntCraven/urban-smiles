@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-cream: #fbfaf8;
+  --color-sand: #f1ede7;
+  --color-ink: #0f2a26;
+  --color-muted: #5a6b67;
+  --color-teal: #0e5d52;
+  --color-teal-dark: #0a4a41;
+  --color-mint: #cfe9e1;
+  --color-gold: #a07a1e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html {
+  --header-height: 6.25rem;
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--header-height);
+  scroll-snap-type: y proximity;
+}
+
+[data-parallax] {
+  transform: translate3d(0, var(--parallax-y, 0), 0);
+  will-change: transform;
+}
+
+@media (width < 48rem) {
+  [data-parallax] {
+    transform: none;
+    will-change: auto;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Reveals ship their hidden state in the SSR markup, so without a script to
+   run the animation the content would never appear. */
+@media (scripting: none) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+  }
+
+  [data-parallax] {
+    transform: none;
+    will-change: auto;
+  }
 }

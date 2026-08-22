@@ -1,0 +1,12 @@
+---
+description: Product identity and implementation defaults for the dental booking app
+alwaysApply: true
+---
+
+# Product defaults
+
+- Domain: dental clinic marketing + appointment booking (not a generic SaaS template).
+- Tone: professional, calm, trustworthy; avoid playful consumer-app copy.
+- Accessibility: keyboard-accessible tabs, expandable bios, and booking forms; gallery images need alt text.
+- Routes to preserve: `/` (home sections), `/services/[slug]` (treatment pages). Add `/book` only if the booking CTA needs a full page; prefer a modal that reuses the same form as the home embed.
+- When adding features (auth, admin, payments), keep the public IA above intact.
