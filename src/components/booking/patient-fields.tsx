@@ -41,6 +41,7 @@ export function PatientVerificationFields({
   errors,
   documentErrors = {},
   coverageType,
+  coverageControlled = false,
   noMiddleName,
   firstName,
   surname,
@@ -60,6 +61,8 @@ export function PatientVerificationFields({
   errors: Partial<Record<AppointmentField, string>>;
   documentErrors?: Partial<Record<DocumentKind, string>>;
   coverageType: CoverageType;
+  /** /book drives the radio from React state; the wizard lets RHF own it. */
+  coverageControlled?: boolean;
   noMiddleName: boolean;
   firstName: InputBind;
   surname: InputBind;
@@ -269,6 +272,9 @@ export function PatientVerificationFields({
                   className="sr-only"
                   {...coverageTypeBind}
                   value={option.value}
+                  {...(coverageControlled
+                    ? { checked: coverageType === option.value }
+                    : {})}
                 />
                 <span className="font-semibold text-ink">{option.label}</span>
               </label>

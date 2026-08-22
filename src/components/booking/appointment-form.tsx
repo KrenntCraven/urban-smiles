@@ -198,6 +198,7 @@ export function AppointmentForm({
         errors={errors}
         documentErrors={documentErrors}
         coverageType={coverageType}
+        coverageControlled
         noMiddleName={noMiddleName}
         firstName={{
           name: "firstName",
