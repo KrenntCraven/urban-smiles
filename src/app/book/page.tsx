@@ -41,8 +41,9 @@ export default async function BookPage(props: PageProps<"/book">) {
       </h1>
 
       <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink/80">
-        Tell us when suits you and we&rsquo;ll confirm by SMS within one
-        business hour. Nothing is charged today.
+        Tell us when suits you. After you send ID or HMO details, the booking
+        sits in pending verification until front desk approves it. Nothing is
+        charged today.
       </p>
 
       <div className="mt-8 rounded-2xl bg-cream p-4 shadow-lg shadow-ink/5 ring-1 ring-ink/10 sm:mt-10 sm:p-8">

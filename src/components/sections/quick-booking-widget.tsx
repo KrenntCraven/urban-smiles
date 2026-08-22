@@ -2,19 +2,27 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { submitAppointment } from "@/lib/booking/actions";
 import { initialAppointmentState } from "@/lib/booking/form-state";
 import {
   appointmentSchema,
+  bindClinicDateMin,
   clinicToday,
   LOCATIONS,
   TIME_SLOTS,
+  toNameCase,
   type AppointmentField,
   type AppointmentInput,
   type LocationId,
 } from "@/lib/booking/schema";
+import { PatientVerificationFields } from "@/components/booking/patient-fields";
+import {
+  Field,
+  fieldCopy,
+  inputClass,
+} from "@/components/booking/field";
 import type { ServiceOption } from "@/lib/services/types";
 
 export type BookingDentistOption = {
@@ -26,25 +34,36 @@ export type BookingDentistOption = {
   defaultServiceSlug: string;
 };
 
-const steps = ["BRANCH", "SERVICE", "DATETIME", "DETAILS"] as const;
+const steps = ["VISIT", "DETAILS"] as const;
 type BookingStep = (typeof steps)[number];
 
 const stepLabels: Record<BookingStep, string> = {
-  BRANCH: "Branch",
-  SERVICE: "Care",
-  DATETIME: "Date & time",
+  VISIT: "Visit",
   DETAILS: "Your details",
 };
 
 const stepFields: Record<BookingStep, AppointmentField[]> = {
-  BRANCH: ["locationId"],
-  SERVICE: ["serviceSlug", "dentistSlug"],
-  DATETIME: ["preferredDate", "preferredTime"],
-  DETAILS: ["fullName", "email", "phone", "isNewPatient"],
+  VISIT: [
+    "locationId",
+    "serviceSlug",
+    "dentistSlug",
+    "preferredDate",
+    "preferredTime",
+  ],
+  DETAILS: [
+    "firstName",
+    "middleName",
+    "noMiddleName",
+    "surname",
+    "suffix",
+    "email",
+    "phone",
+    "coverageType",
+    "hmoProvider",
+    "hmoMemberId",
+    "privacyConsent",
+  ],
 };
-
-const inputClass =
-  "min-h-11 w-full rounded-xl border border-ink/15 bg-cream px-4 py-3 text-base text-ink transition-colors placeholder:text-muted/70 focus-visible:border-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal sm:text-sm";
 
 function resolveDentist(
   value: string | null,
@@ -72,10 +91,9 @@ export function QuickBookingWidget({
   dentists: readonly BookingDentistOption[];
 }) {
   const reduceMotion = useReducedMotion();
-  const [step, setStep] = useState<BookingStep>("BRANCH");
+  const [step, setStep] = useState<BookingStep>("VISIT");
   const [serverState, setServerState] = useState(initialAppointmentState);
   const [isPending, startTransition] = useTransition();
-  const dateRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -88,10 +106,15 @@ export function QuickBookingWidget({
   } = useForm<AppointmentInput>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      fullName: "",
+      firstName: "",
+      surname: "",
       email: "",
       phone: "",
+      noMiddleName: false,
+      privacyConsent: false,
       isNewPatient: true,
+      channel: "website",
+      coverageType: "self-pay",
     },
     mode: "onTouched",
     shouldUnregister: false,
@@ -107,9 +130,21 @@ export function QuickBookingWidget({
   );
   const preferredDateField = register("preferredDate");
 
-  useEffect(() => {
-    if (dateRef.current) dateRef.current.min = clinicToday();
-  }, []);
+  // Field renders its error as `${htmlFor}-error`, so inputs point at that id.
+  const describedBy = (id: string, message?: string) =>
+    message ? `${id}-error` : undefined;
+
+  // Mirrors the transform in appointmentSchema so the patient sees the stored
+  // spelling before submitting, not after.
+  const nameField = (name: "firstName" | "middleName" | "surname") =>
+    register(name, {
+      onBlur: (event) => {
+        const cased = toNameCase(event.target.value);
+        if (cased !== event.target.value) {
+          setValue(name, cased, { shouldValidate: true });
+        }
+      },
+    });
 
   // Read the browser URL after hydration so the full section remains in the
   // server-rendered HTML. Explicit query parameters are the durable contract;
@@ -161,7 +196,9 @@ export function QuickBookingWidget({
 
       const requestedDate = source.searchParams.get("date");
       const requestedTime = source.searchParams.get("time");
-      if (requestedDate) setValue("preferredDate", requestedDate);
+      if (requestedDate && requestedDate >= clinicToday()) {
+        setValue("preferredDate", requestedDate);
+      }
       if (requestedTime) setValue("preferredTime", requestedTime);
     } catch {
       // Invalid or privacy-stripped referrers simply leave the form unprefilled.
@@ -189,15 +226,31 @@ export function QuickBookingWidget({
     });
   };
 
-  const onSubmit = handleSubmit((data) => {
+  const onSubmit = handleSubmit((data, event) => {
     const formData = new FormData();
+    formData.set("channel", "website");
+
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined || value === "") continue;
-      if (key === "isNewPatient") {
+      if (
+        key === "isNewPatient" ||
+        key === "noMiddleName" ||
+        key === "privacyConsent"
+      ) {
         if (value) formData.set(key, "on");
         continue;
       }
       formData.set(key, String(value));
+    }
+
+    const native = event?.target;
+    if (native instanceof HTMLFormElement) {
+      for (const kind of ["hmoCardFront", "hmoCardBack", "governmentId"]) {
+        const input = native.elements.namedItem(kind);
+        if (input instanceof HTMLInputElement && input.files?.[0]) {
+          formData.set(kind, input.files[0]);
+        }
+      }
     }
 
     startTransition(async () => {
@@ -243,15 +296,15 @@ export function QuickBookingWidget({
               </svg>
             </span>
             <h2 className="mt-5 font-display text-3xl font-semibold text-ink">
-              Request received
+              Pending verification
             </h2>
             <p className="mt-3 leading-relaxed text-muted">
               Reference{" "}
               <span className="font-semibold text-ink tabular-nums">
                 {serverState.reference}
               </span>
-              . Our team will text you within one business hour to confirm the
-              slot.
+              . Front desk will review your ID or HMO card, then text you to
+              confirm the slot.
             </p>
           </div>
         </div>
@@ -269,11 +322,12 @@ export function QuickBookingWidget({
               Quick Booking
             </p>
             <h2 className="mt-5 font-display text-3xl leading-[1.1] font-semibold tracking-[0.01em] text-ink uppercase sm:text-4xl lg:text-5xl">
-              Request your visit in four steps.
+              Request your visit in two steps.
             </h2>
             <p className="mt-6 max-w-xl leading-relaxed text-muted">
-              Choose where and when you would like to come in. We will confirm
-              the appointment by SMS within one business hour.
+              Pick the slot first, then send the same identity and coverage
+              details as the full booking form. Front desk reviews that file
+              before confirming by SMS.
             </p>
 
             <p className="mt-8 rounded-2xl bg-mint/40 p-5 text-sm leading-relaxed text-muted ring-1 ring-teal/20">
@@ -290,7 +344,7 @@ export function QuickBookingWidget({
           >
             <ol
               aria-label="Booking progress"
-              className="grid grid-cols-4 border-b border-ink/10 bg-sand/40"
+              className="grid grid-cols-2 border-b border-ink/10 bg-sand/40"
             >
               {steps.map((item, index) => {
                 const isCurrent = item === step;
@@ -324,7 +378,7 @@ export function QuickBookingWidget({
               })}
             </ol>
 
-            <div className="min-h-96 p-6 sm:p-8">
+            <div className="min-h-96 px-5 py-6 sm:p-8">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={step}
@@ -337,55 +391,53 @@ export function QuickBookingWidget({
                     Step {currentIndex + 1} of {steps.length}
                   </p>
                   <h3 className="mt-2 font-display text-2xl font-semibold text-ink">
-                    {step === "BRANCH" && "Choose a branch"}
-                    {step === "SERVICE" && "Choose your care"}
-                    {step === "DATETIME" && "Choose a date and time"}
-                    {step === "DETAILS" && "Tell us how to reach you"}
+                    {step === "VISIT" && "Choose your visit"}
+                    {step === "DETAILS" && "Confirm your identity"}
                   </h3>
 
-                  {step === "BRANCH" && (
-                    <fieldset className="mt-7">
-                      <legend className="sr-only">Urban Smiles branch</legend>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {LOCATIONS.map((location) => (
-                          <label
-                            key={location.id}
-                            className={`flex min-h-20 cursor-pointer items-center rounded-2xl p-4 ring-1 transition-colors ${
-                              values.locationId === location.id
-                                ? "bg-mint/40 ring-teal"
-                                : "bg-cream ring-ink/10 hover:ring-teal/50"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              value={location.id}
-                              className="sr-only"
-                              {...register("locationId")}
-                            />
-                            <span>
-                              <span className="block font-semibold text-ink">
-                                {location.name.split(" — ")[0]}
-                              </span>
-                              <span className="mt-1 block text-sm text-muted">
-                                {location.name.split(" — ")[1]}
-                              </span>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                      {errors.locationId && (
-                        <p className="mt-3 text-sm text-teal-dark" role="alert">
-                          {errors.locationId.message}
-                        </p>
-                      )}
-                    </fieldset>
-                  )}
-
-                  {step === "SERVICE" && (
-                    <div className="mt-7 space-y-6">
+                  {step === "VISIT" && (
+                    <div className="mt-7 space-y-8">
                       <fieldset>
                         <legend className="text-sm font-medium text-ink">
-                          Treatment
+                          {fieldCopy.locationId.label}
+                        </legend>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                          {LOCATIONS.map((location) => (
+                            <label
+                              key={location.id}
+                              className={`flex min-h-20 cursor-pointer items-center rounded-2xl p-4 ring-1 transition-colors ${
+                                values.locationId === location.id
+                                  ? "bg-mint/40 ring-teal"
+                                  : "bg-cream ring-ink/10 hover:ring-teal/50"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                value={location.id}
+                                className="sr-only"
+                                {...register("locationId")}
+                              />
+                              <span>
+                                <span className="block font-semibold text-ink">
+                                  {location.name.split(" — ")[0]}
+                                </span>
+                                <span className="mt-1 block text-sm text-muted">
+                                  {location.name.split(" — ")[1]}
+                                </span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        {errors.locationId && (
+                          <p className="mt-3 text-xs text-teal-dark" role="alert">
+                            {errors.locationId.message}
+                          </p>
+                        )}
+                      </fieldset>
+
+                      <fieldset>
+                        <legend className="text-sm font-medium text-ink">
+                          {fieldCopy.serviceSlug.label}
                         </legend>
                         <div className="mt-2 grid gap-3 sm:grid-cols-2">
                           {services.map((service) => (
@@ -408,30 +460,29 @@ export function QuickBookingWidget({
                           ))}
                         </div>
                         {errors.serviceSlug && (
-                          <p
-                            className="mt-3 text-sm text-teal-dark"
-                            role="alert"
-                          >
+                          <p className="mt-3 text-xs text-teal-dark" role="alert">
                             {errors.serviceSlug.message}
                           </p>
                         )}
                       </fieldset>
 
-                      <div>
-                        <label
-                          htmlFor="quick-booking-dentist"
-                          className="text-sm font-medium text-ink"
-                        >
-                          Preferred dentist{" "}
-                          <span className="text-muted">(optional)</span>
-                        </label>
+                      <Field
+                        label={fieldCopy.dentistSlug.label}
+                        htmlFor="quick-booking-dentist"
+                        optional
+                        hint={
+                          selectedDentist
+                            ? `Selecting ${selectedDentist.name} also selects their branch and usual treatment.`
+                            : undefined
+                        }
+                      >
                         <select
                           id="quick-booking-dentist"
                           value={values.dentistSlug ?? ""}
                           onChange={(event) =>
                             chooseDentist(event.currentTarget.value)
                           }
-                          className={`${inputClass} mt-2`}
+                          className={inputClass}
                         >
                           <option value="">No preference</option>
                           {dentists.map((dentist) => (
@@ -447,166 +498,58 @@ export function QuickBookingWidget({
                             setValueAs: (value) => value || undefined,
                           })}
                         />
-                        {selectedDentist && (
-                          <p className="mt-2 text-xs text-muted">
-                            Selecting {selectedDentist.name} also selects their
-                            branch and usual treatment.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {step === "DATETIME" && (
-                    <div className="mt-7 grid gap-5 sm:grid-cols-2">
-                      <div>
-                        <label
-                          htmlFor="quick-booking-date"
-                          className="mb-1.5 block text-sm font-medium text-ink"
-                        >
-                          Preferred date
-                        </label>
-                        <input
-                          id="quick-booking-date"
-                          type="date"
-                          className={`${inputClass} tabular-nums`}
-                          aria-invalid={Boolean(errors.preferredDate)}
-                          {...preferredDateField}
-                          ref={(node) => {
-                            preferredDateField.ref(node);
-                            dateRef.current = node;
-                          }}
-                        />
-                        {errors.preferredDate && (
-                          <p
-                            className="mt-1.5 text-xs text-teal-dark"
-                            role="alert"
-                          >
-                            {errors.preferredDate.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="quick-booking-time"
-                          className="mb-1.5 block text-sm font-medium text-ink"
-                        >
-                          Preferred time
-                        </label>
-                        <select
-                          id="quick-booking-time"
-                          className={`${inputClass} tabular-nums`}
-                          aria-invalid={Boolean(errors.preferredTime)}
-                          {...register("preferredTime")}
-                        >
-                          <option value="">Select a time</option>
-                          {TIME_SLOTS.map((slot) => (
-                            <option key={slot} value={slot}>
-                              {slot}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.preferredTime && (
-                          <p
-                            className="mt-1.5 text-xs text-teal-dark"
-                            role="alert"
-                          >
-                            {errors.preferredTime.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {step === "DETAILS" && (
-                    <div className="mt-7 space-y-5">
-                      <div>
-                        <label
-                          htmlFor="quick-booking-name"
-                          className="mb-1.5 block text-sm font-medium text-ink"
-                        >
-                          Full name
-                        </label>
-                        <input
-                          id="quick-booking-name"
-                          type="text"
-                          autoComplete="name"
-                          className={inputClass}
-                          aria-invalid={Boolean(errors.fullName)}
-                          {...register("fullName")}
-                        />
-                        {errors.fullName && (
-                          <p
-                            className="mt-1.5 text-xs text-teal-dark"
-                            role="alert"
-                          >
-                            {errors.fullName.message}
-                          </p>
-                        )}
-                      </div>
+                      </Field>
 
                       <div className="grid gap-5 sm:grid-cols-2">
-                        <div>
-                          <label
-                            htmlFor="quick-booking-email"
-                            className="mb-1.5 block text-sm font-medium text-ink"
-                          >
-                            Email
-                          </label>
+                        <Field
+                          label={fieldCopy.preferredDate.label}
+                          htmlFor="quick-booking-date"
+                          error={errors.preferredDate?.message}
+                        >
                           <input
-                            id="quick-booking-email"
-                            type="email"
-                            autoComplete="email"
-                            className={inputClass}
-                            aria-invalid={Boolean(errors.email)}
-                            {...register("email")}
+                            id="quick-booking-date"
+                            type="date"
+                            className={`${inputClass} tabular-nums`}
+                            aria-invalid={Boolean(errors.preferredDate)}
+                            aria-describedby={describedBy(
+                              "quick-booking-date",
+                              errors.preferredDate?.message,
+                            )}
+                            {...preferredDateField}
+                            ref={(node) => {
+                              preferredDateField.ref(node);
+                              bindClinicDateMin(node);
+                            }}
                           />
-                          {errors.email && (
-                            <p
-                              className="mt-1.5 text-xs text-teal-dark"
-                              role="alert"
-                            >
-                              {errors.email.message}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label
-                            htmlFor="quick-booking-phone"
-                            className="mb-1.5 block text-sm font-medium text-ink"
+                        </Field>
+                        <Field
+                          label={fieldCopy.preferredTime.label}
+                          htmlFor="quick-booking-time"
+                          error={errors.preferredTime?.message}
+                        >
+                          <select
+                            id="quick-booking-time"
+                            className={`${inputClass} tabular-nums`}
+                            aria-invalid={Boolean(errors.preferredTime)}
+                            aria-describedby={describedBy(
+                              "quick-booking-time",
+                              errors.preferredTime?.message,
+                            )}
+                            {...register("preferredTime")}
                           >
-                            Mobile number
-                          </label>
-                          <input
-                            id="quick-booking-phone"
-                            type="tel"
-                            inputMode="tel"
-                            autoComplete="tel"
-                            placeholder="09171234567"
-                            className={inputClass}
-                            aria-invalid={Boolean(errors.phone)}
-                            {...register("phone")}
-                          />
-                          {errors.phone && (
-                            <p
-                              className="mt-1.5 text-xs text-teal-dark"
-                              role="alert"
-                            >
-                              {errors.phone.message}
-                            </p>
-                          )}
-                        </div>
+                            <option value="">Select a time</option>
+                            {TIME_SLOTS.map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
                       </div>
-
-                      <label className="flex min-h-11 items-center gap-3 rounded-xl text-sm text-muted">
-                        <input
-                          type="checkbox"
-                          className="size-5 shrink-0 rounded border-ink/25 text-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-                          {...register("isNewPatient")}
-                        />
-                        This is my first visit to Urban Smiles
-                      </label>
-
+                    </div>
+                  )}
+                  {step === "DETAILS" && (
+                    <div className="mt-7 space-y-8">
                       <div className="rounded-2xl bg-sand/40 p-4">
                         <p className="text-xs font-semibold tracking-[0.18em] text-muted uppercase">
                           Your request
@@ -622,9 +565,54 @@ export function QuickBookingWidget({
                           , {values.preferredDate} at {values.preferredTime}
                           {selectedDentist
                             ? ` with ${selectedDentist.name}`
-                            : ""}.
+                            : ""}
+                          .
                         </p>
                       </div>
+
+                      <PatientVerificationFields
+                        Title="h4"
+                        idFor={(field) => `quick-booking-${field}`}
+                        errors={{
+                          firstName: errors.firstName?.message,
+                          middleName: errors.middleName?.message,
+                          surname: errors.surname?.message,
+                          suffix: errors.suffix?.message,
+                          email: errors.email?.message,
+                          phone: errors.phone?.message,
+                          coverageType: errors.coverageType?.message,
+                          hmoProvider: errors.hmoProvider?.message,
+                          hmoMemberId: errors.hmoMemberId?.message,
+                          privacyConsent: errors.privacyConsent?.message,
+                        }}
+                        documentErrors={serverState.documentErrors}
+                        coverageType={values.coverageType ?? "self-pay"}
+                        noMiddleName={Boolean(values.noMiddleName)}
+                        firstName={nameField("firstName")}
+                        surname={nameField("surname")}
+                        middleName={nameField("middleName")}
+                        suffix={register("suffix", {
+                          setValueAs: (value) => value || undefined,
+                        })}
+                        phone={register("phone")}
+                        email={register("email")}
+                        coverageTypeBind={register("coverageType")}
+                        hmoProvider={register("hmoProvider", {
+                          setValueAs: (value) => value || undefined,
+                        })}
+                        hmoMemberId={register("hmoMemberId")}
+                        noMiddleNameBind={register("noMiddleName", {
+                          onChange: (event) => {
+                            if (event.currentTarget.checked) {
+                              setValue("middleName", "", {
+                                shouldValidate: true,
+                              });
+                            }
+                          },
+                        })}
+                        privacyConsent={register("privacyConsent")}
+                        isNewPatient={register("isNewPatient")}
+                      />
                     </div>
                   )}
                 </motion.div>
@@ -632,12 +620,12 @@ export function QuickBookingWidget({
             </div>
 
             {serverState.formError && (
-              <p className="px-6 text-sm text-teal-dark sm:px-8" role="alert">
+              <p className="px-5 text-sm text-teal-dark sm:px-8" role="alert">
                 {serverState.formError}
               </p>
             )}
 
-            <div className="flex flex-col-reverse gap-3 border-t border-ink/10 bg-sand/20 p-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <div className="flex flex-col-reverse gap-3 border-t border-ink/10 bg-sand/20 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
               <button
                 type="button"
                 onClick={goBack}
@@ -663,11 +651,11 @@ export function QuickBookingWidget({
                         Sending request…
                       </>
                     ) : (
-                      "Confirm Booking Request"
+                      "Submit for verification"
                     )}
                   </button>
                   <p className="mt-2 text-center text-xs text-muted sm:text-right">
-                    No payment today
+                    Status starts as pending verification
                   </p>
                 </div>
               ) : (

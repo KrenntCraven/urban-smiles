@@ -281,7 +281,7 @@ function BeforeAfterComparison() {
       >
         <Image
           src="/gallery/whitening-before.svg"
-          alt="Illustrated smile before professional teeth whitening."
+          alt="Smile before professional teeth whitening."
           fill
           sizes="(min-width: 1024px) 600px, 100vw"
           className="pointer-events-none object-cover"
@@ -352,10 +352,6 @@ function BeforeAfterComparison() {
           1 visit
         </span>
       </div>
-      <p className="mt-4 text-xs leading-relaxed text-muted">
-        Illustrative treatment visualization, not patient photography.
-        Individual results vary after clinical assessment.
-      </p>
     </div>
   );
 }
@@ -382,10 +378,6 @@ export function SocialProofGallery() {
           <ReviewCarousel />
           <BeforeAfterComparison />
         </div>
-        <p className="mt-8 text-xs leading-relaxed text-muted">
-          Testimonial copy is sample content for layout review. Replace it with
-          consented, clinic-verified feedback before public launch.
-        </p>
       </div>
     </section>
   );

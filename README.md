@@ -126,13 +126,23 @@ Validated by `appointmentSchema` on the server (`submitAppointment` in `src/lib/
 | `locationId` | Yes; one of the four branch ids |
 | `preferredDate` | Yes; today or later in Asia/Manila |
 | `preferredTime` | Yes |
-| `fullName`, `email`, `phone` | Yes; PH mobile `09XXXXXXXXX` or `+639XXXXXXXXX` |
-| `dentistSlug` | Optional; must exist on the roster if sent |
-| `isNewPatient`, `notes` | Optional |
+| `firstName`, `surname` | Yes |
+| `middleName` | Yes unless `noMiddleName` is checked |
+| `phone` | Yes; PH mobile `09XXXXXXXXX` or `+639XXXXXXXXX` |
+| `email` | Yes on website bookings; optional on Messenger |
+| `coverageType` | Yes; `hmo` or `self-pay` |
+| HMO fields + card photos | Required when coverage is HMO |
+| Government ID photo | Required when self-pay |
+| `privacyConsent` | Must be true; Data Privacy Act of 2012 |
+| `dentistSlug`, `suffix`, `notes` | Optional |
+
+Submissions are stored in memory on the server process with status `pending_verification`. Front desk reviews them at `/staff` (not in the public nav). Set `STAFF_PIN` in the environment; see `.env.example`. Uploaded images are not in `public/` and are only served to a signed-in staff session.
+
+On Vercel the in-memory queue does not survive cold starts. A database and object store still need wiring for production persistence.
 
 ### Wizard steps
 
-`BRANCH` → `SERVICE` → `DATETIME` → `DETAILS`. Choosing a dentist also sets their branch and default treatment; the patient can still change those.
+`BRANCH` → `SERVICE` → `DATETIME` → `DETAILS` (identity, contact, coverage, consent). Choosing a dentist also sets their branch and default treatment; the patient can still change those.
 
 ## Layout of the repo
 
@@ -158,7 +168,7 @@ Design tokens (`cream`, `sand`, `ink`, `muted`, `teal`, `mint`, `gold`) live und
 
 ## What’s still open
 
-**Booking backend.** `submitAppointment` validates and mints a reference. Persistence, SMS confirmation, and calendar holds are not implemented. Search the repo for `BOOKING-BACKEND`.
+**Booking backend.** `submitAppointment` validates, stores the request as pending verification, and mints a reference. SMS, email, and durable storage (database + object store) are not wired for production. Search the repo for `STAFF_PIN`.
 
 **Home IA vs. the live page.** The intended home order in `.cursor/rules/dental-site-ia.mdc` still includes a sticky quick-book widget, a dedicated trust bar, a tabbed About, and a “Meet the dentists” block on `/`. Live home is hero → philosophy → services → reviews → embedded wizard. Dentists live on `/dentists`. The emergency `tel:` strip is in the header on every route.
 
