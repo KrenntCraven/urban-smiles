@@ -83,7 +83,7 @@ export const fieldCopy = {
   suffix: { label: "Suffix" },
   phone: {
     label: "Mobile number",
-    hint: "09XXXXXXXXX or +639XXXXXXXXX. We confirm your slot by SMS.",
+    hint: "09XXXXXXXXX or +639XXXXXXXXX.",
   },
   email: {
     label: "Email",

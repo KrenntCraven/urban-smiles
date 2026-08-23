@@ -37,7 +37,8 @@ export function SiteFooter() {
             </Link>
             <p className="mt-4 max-w-sm leading-relaxed text-muted">
               Comprehensive, gentle dental care across Metro Manila. Written
-              treatment plans, HMO cards accepted, and a confirmed slot by SMS.
+              treatment plans, HMO cards accepted, and visits confirmed
+              automatically after verification.
             </p>
             <a
               href={`tel:${EMERGENCY_TEL}`}

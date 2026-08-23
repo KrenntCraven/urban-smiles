@@ -289,8 +289,8 @@ export function AppointmentForm({
           <span className="font-semibold text-ink tabular-nums">
             {state.reference}
           </span>
-          . Front desk will review your ID or HMO card before confirming the
-          slot by SMS.
+          . Front desk will verify your ID or HMO card. Once approved, the slot
+          is confirmed automatically.
         </p>
       </div>
     );

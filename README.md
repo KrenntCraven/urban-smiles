@@ -136,7 +136,7 @@ Validated by `appointmentSchema` on the server (`submitAppointment` in `src/lib/
 | `privacyConsent` | Must be true; Data Privacy Act of 2012 |
 | `dentistSlug`, `suffix`, `notes` | Optional |
 
-Submissions are stored in memory on the server process with status `pending_verification`. Front desk reviews them at `/staff` (not in the public nav). Set `STAFF_PIN` in the environment; see `.env.example`. Uploaded images are not in `public/` and are only served to a signed-in staff session.
+Submissions are stored in memory on the server process with status `pending_verification`. Front desk reviews them at `/admin/bookings` (password: `ADMIN_PASSWORD`) or the existing `/staff` queue (`STAFF_PIN`). Neither is linked from the public nav. Uploaded images are not in `public/` and are only served to a signed-in admin or staff session.
 
 On Vercel the in-memory queue does not survive cold starts. A database and object store still need wiring for production persistence.
 
@@ -148,15 +148,20 @@ On Vercel the in-memory queue does not survive cold starts. A database and objec
 
 ```text
 src/app/                  Routes, layout, icons
+src/app/admin/            Password-protected bookings dashboard
+src/middleware.ts         Guards /admin and /api/v1/admin
 src/components/
   sections/               Home blocks (Hero, Philosophy, …)
   booking/                Shared form + service-page modal
+  admin/                  Dashboard table, ID lightbox, reject dialog
   team/                   Dentist cards, filter, profile dialog
   services/               FAQs, sticky booking card
 src/lib/
   booking/                Schema, server action, form state
+  admin/                  Session, FastAPI client, booking mapping
   services/               Catalog, types, formatters
   team/                   Roster and specialties
+backend/                  Optional FastAPI admin API (SQLAlchemy / Supabase)
 public/team/              Named staff photos
 public/gallery/           Illustrative before/after SVGs (not patient photos)
 scripts/generate-icons.mjs
@@ -168,7 +173,7 @@ Design tokens (`cream`, `sand`, `ink`, `muted`, `teal`, `mint`, `gold`) live und
 
 ## What’s still open
 
-**Booking backend.** `submitAppointment` validates, stores the request as pending verification, and mints a reference. SMS, email, and durable storage (database + object store) are not wired for production. Search the repo for `STAFF_PIN`.
+**Booking backend.** `submitAppointment` validates, stores the request as pending verification, and mints a reference. The `/admin` dashboard can keep using that in-memory store, or proxy to FastAPI when `FASTAPI_BASE_URL` and `ADMIN_API_TOKEN` are set. SMS, email, and durable storage still need wiring for production. Search the repo for `ADMIN_PASSWORD` and `STAFF_PIN`.
 
 **Home IA vs. the live page.** The intended home order in `.cursor/rules/dental-site-ia.mdc` still includes a sticky quick-book widget, a dedicated trust bar, a tabbed About, and a “Meet the dentists” block on `/`. Live home is hero → philosophy → services → reviews → embedded wizard. Dentists live on `/dentists`. The emergency `tel:` strip is in the header on every route.
 

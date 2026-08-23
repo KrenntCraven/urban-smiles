@@ -10,7 +10,7 @@ import { resolveDentistId } from "@/lib/team/roster";
 export const metadata: Metadata = {
   title: "Book an Appointment — Urban Smiles",
   description:
-    "Request a visit at any Urban Smiles branch. Confirmation by SMS within one business hour.",
+    "Request a visit at any Urban Smiles branch. Front desk verifies the request; once approved, the slot is confirmed automatically.",
 };
 
 export default async function BookPage(props: PageProps<"/book">) {

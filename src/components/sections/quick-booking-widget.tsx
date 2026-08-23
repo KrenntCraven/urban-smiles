@@ -319,8 +319,8 @@ export function QuickBookingWidget({
               <span className="font-semibold text-ink tabular-nums">
                 {serverState.reference}
               </span>
-              . Front desk will review your ID or HMO card, then text you to
-              confirm the slot.
+              . Front desk will verify your ID or HMO card. Once approved, the
+              slot is confirmed automatically.
             </p>
           </div>
         </div>
@@ -342,8 +342,8 @@ export function QuickBookingWidget({
             </h2>
             <p className="mt-6 max-w-xl leading-relaxed text-muted">
               Pick the slot, tell us who you are, then send your coverage
-              details. Front desk reviews the same complete request before
-              confirming by SMS.
+              details. Front desk verifies the same complete request; once
+              approved, the visit is confirmed automatically.
             </p>
 
             <p className="mt-8 rounded-2xl bg-mint/40 p-5 text-sm leading-relaxed text-muted ring-1 ring-teal/20">
