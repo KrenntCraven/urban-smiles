@@ -45,7 +45,11 @@ export function clinicToday(): string {
  * stale by the next morning.
  */
 export function bindClinicDateMin(input: HTMLInputElement | null) {
-  if (input) input.min = clinicToday();
+  if (!input) return;
+  // Re-assigning `min` discards half-typed segments, and the home widget
+  // re-renders on every keystroke, so only write it when it actually changes.
+  const min = clinicToday();
+  if (input.min !== min) input.min = min;
 }
 
 const TIME_24H = /^([01]\d|2[0-3]):[0-5]\d$/;

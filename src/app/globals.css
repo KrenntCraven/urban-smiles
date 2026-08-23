@@ -35,12 +35,113 @@ html {
   }
 }
 
+/* Booking panels stay mounted while patients move between steps. This keeps
+   typed values and selected files intact instead of rebuilding the inputs. */
+[data-booking-panel][data-active="false"] {
+  display: none;
+}
+
+[data-verification-panel][data-active="false"] {
+  display: none;
+}
+
+@media (width < 48rem) and (scripting: enabled) {
+  [data-appointment-step="identity"] [data-booking-panel="visit"],
+  [data-appointment-step="coverage"] [data-booking-panel="visit"] {
+    display: none;
+  }
+
+  [data-appointment-step="visit"] [data-verification-panel],
+  [data-appointment-step="identity"]
+    [data-verification-panel="coverage"],
+  [data-appointment-step="coverage"]
+    [data-verification-panel="identity"] {
+    position: absolute;
+    left: -200vw;
+    width: min(100%, 40rem);
+    pointer-events: none;
+  }
+
+  [data-mobile-nav-step] {
+    display: none;
+  }
+
+  [data-appointment-step="visit"]
+    [data-mobile-nav-step][data-show-on-step="visit"],
+  [data-appointment-step="identity"]
+    [data-mobile-nav-step][data-show-on-step="identity"],
+  [data-appointment-step="coverage"]
+    [data-mobile-nav-step][data-show-on-step="coverage"] {
+    display: inline-flex;
+  }
+
+  [data-appointment-step="visit"]
+    [data-progress-step="visit"]
+    > span:first-child,
+  [data-appointment-step="identity"]
+    [data-progress-step="identity"]
+    > span:first-child,
+  [data-appointment-step="coverage"]
+    [data-progress-step="coverage"]
+    > span:first-child {
+    background: var(--color-teal);
+    color: var(--color-cream);
+    box-shadow: none;
+  }
+
+  [data-appointment-step="identity"]
+    [data-progress-step="visit"]
+    > span:first-child,
+  [data-appointment-step="coverage"]
+    [data-progress-step="visit"]
+    > span:first-child,
+  [data-appointment-step="coverage"]
+    [data-progress-step="identity"]
+    > span:first-child {
+    background: var(--color-mint);
+    color: var(--color-teal);
+  }
+}
+
+@media (width >= 48rem) {
+  [data-booking-panel][data-show-from-tablet="true"],
+  [data-verification-panel][data-show-from-tablet="true"] {
+    display: block;
+    position: static;
+    left: auto;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    pointer-events: auto;
+    white-space: normal;
+  }
+}
+
 /* Reveals ship their hidden state in the SSR markup, so without a script to
    run the animation the content would never appear. */
 @media (scripting: none) {
   [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  [data-booking-panel],
+  [data-verification-panel],
+  [data-booking-desktop-submit] {
+    display: block !important;
+    position: static !important;
+    left: auto !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    clip-path: none !important;
+    pointer-events: auto !important;
+    white-space: normal !important;
+  }
+
+  [data-booking-mobile-nav] {
+    display: none !important;
   }
 }
 

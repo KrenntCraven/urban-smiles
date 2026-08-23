@@ -43,6 +43,11 @@ export function BookServiceButton({
     const dialog = dialogRef.current;
     if (typeof dialog?.showModal !== "function") return;
 
+    // A long form inside a phone-sized dialog creates nested scrolling. Keep
+    // the link's normal /book navigation on small screens; its href already
+    // carries the selected service into the full-page mobile stepper.
+    if (!window.matchMedia("(min-width: 768px)").matches) return;
+
     event.preventDefault();
     dialog.showModal();
     setIsOpen(true);

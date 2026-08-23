@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { ComponentPropsWithoutRef, ElementType, FocusEvent } from "react";
 import {
   acceptAttribute,
@@ -30,6 +30,38 @@ import {
 
 type InputBind = ComponentPropsWithoutRef<"input">;
 type SelectBind = ComponentPropsWithoutRef<"select">;
+export type VerificationSection = "all" | "none" | "identity" | "coverage";
+
+const DocumentUploadField = memo(function DocumentUploadField({
+  id,
+  kind,
+  error,
+  optional = false,
+}: {
+  id: string;
+  kind: DocumentKind;
+  error?: string;
+  optional?: boolean;
+}) {
+  return (
+    <Field
+      label={fieldCopy[kind].label}
+      htmlFor={id}
+      error={error}
+      hint={uploadHint(kind)}
+      optional={optional}
+    >
+      <input
+        id={id}
+        name={kind}
+        type="file"
+        accept={acceptAttribute}
+        aria-invalid={Boolean(error)}
+        className={fileInputClass}
+      />
+    </Field>
+  );
+});
 
 /**
  * Identity, contact, coverage, and consent — the same markup for the home
@@ -40,6 +72,8 @@ export function PatientVerificationFields({
   idFor,
   errors,
   documentErrors = {},
+  activeSection = "all",
+  showAllFromTablet = false,
   coverageType,
   coverageControlled = false,
   noMiddleName,
@@ -60,6 +94,8 @@ export function PatientVerificationFields({
   idFor: (field: string) => string;
   errors: Partial<Record<AppointmentField, string>>;
   documentErrors?: Partial<Record<DocumentKind, string>>;
+  activeSection?: VerificationSection;
+  showAllFromTablet?: boolean;
   coverageType: CoverageType;
   /** /book drives the radio from React state; the wizard lets RHF own it. */
   coverageControlled?: boolean;
@@ -81,6 +117,16 @@ export function PatientVerificationFields({
   const [localEmailError, setLocalEmailError] = useState<string>();
   const phoneMessage = errors.phone ?? localPhoneError;
   const emailMessage = errors.email ?? localEmailError;
+  const panelProps = (
+    panel: Exclude<VerificationSection, "all" | "none">,
+  ) => {
+    const active = activeSection === "all" || activeSection === panel;
+    return {
+      "data-verification-panel": panel,
+      "data-active": active ? "true" : "false",
+      "data-show-from-tablet": showAllFromTablet ? "true" : "false",
+    };
+  };
 
   const {
     onBlur: phoneOnBlur,
@@ -109,6 +155,7 @@ export function PatientVerificationFields({
 
   return (
     <div className="space-y-8">
+      <div className="space-y-8" {...panelProps("identity")}>
       <section className="space-y-5">
         <Title className={groupTitleClass}>{bookingCopy.identityGroup}</Title>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -255,7 +302,9 @@ export function PatientVerificationFields({
           </Field>
         </div>
       </section>
+      </div>
 
+      <div className="space-y-8" {...panelProps("coverage")}>
       <section className="space-y-5">
         <fieldset>
           <legend className={groupTitleClass}>
@@ -333,54 +382,24 @@ export function PatientVerificationFields({
                 {...hmoMemberId}
               />
             </Field>
-            <Field
-              label={fieldCopy.hmoCardFront.label}
-              htmlFor={idFor("hmoCardFront")}
+            <DocumentUploadField
+              id={idFor("hmoCardFront")}
+              kind="hmoCardFront"
               error={documentErrors.hmoCardFront}
-              hint={uploadHint("hmoCardFront")}
-            >
-              <input
-                id={idFor("hmoCardFront")}
-                name="hmoCardFront"
-                type="file"
-                accept={acceptAttribute}
-                aria-invalid={Boolean(documentErrors.hmoCardFront)}
-                className={fileInputClass}
-              />
-            </Field>
-            <Field
-              label={fieldCopy.hmoCardBack.label}
-              htmlFor={idFor("hmoCardBack")}
+            />
+            <DocumentUploadField
+              id={idFor("hmoCardBack")}
+              kind="hmoCardBack"
               error={documentErrors.hmoCardBack}
-              hint={uploadHint("hmoCardBack")}
               optional
-            >
-              <input
-                id={idFor("hmoCardBack")}
-                name="hmoCardBack"
-                type="file"
-                accept={acceptAttribute}
-                aria-invalid={Boolean(documentErrors.hmoCardBack)}
-                className={fileInputClass}
-              />
-            </Field>
+            />
           </div>
         ) : (
-          <Field
-            label={fieldCopy.governmentId.label}
-            htmlFor={idFor("governmentId")}
+          <DocumentUploadField
+            id={idFor("governmentId")}
+            kind="governmentId"
             error={documentErrors.governmentId}
-            hint={uploadHint("governmentId")}
-          >
-            <input
-              id={idFor("governmentId")}
-              name="governmentId"
-              type="file"
-              accept={acceptAttribute}
-              aria-invalid={Boolean(documentErrors.governmentId)}
-              className={fileInputClass}
-            />
-          </Field>
+          />
         )}
       </section>
 
@@ -402,6 +421,7 @@ export function PatientVerificationFields({
         <input type="checkbox" className={checkboxClass} {...isNewPatient} />
         {bookingCopy.newPatient}
       </label>
+      </div>
     </div>
   );
 }

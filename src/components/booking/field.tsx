@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import {
   ACCEPTED_DOCUMENT_TYPES,
   MAX_DOCUMENT_BYTES,
@@ -23,6 +23,23 @@ export const fileInputClass =
   "block w-full cursor-pointer rounded-xl border border-ink/15 bg-cream p-2.5 text-sm break-all text-muted transition-colors file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-full file:border-0 file:bg-mint file:px-4 file:text-xs file:font-semibold file:text-teal focus-visible:border-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal";
 
 export const acceptAttribute = ACCEPTED_DOCUMENT_TYPES.join(",");
+
+/**
+ * Desktop browsers only open a date field's picker from the small calendar
+ * glyph, so tapping the rest of the field looks dead at narrow widths. Mobile
+ * already opens on tap and re-opening an open picker is a no-op, so this is
+ * safe everywhere; typing into the segments still works.
+ */
+export function openDatePicker(event: MouseEvent<HTMLInputElement>) {
+  const input = event.currentTarget;
+  if (typeof input.showPicker !== "function") return;
+  try {
+    input.showPicker();
+  } catch {
+    // showPicker throws without user activation or where it is unsupported.
+    // The browser's own calendar glyph remains available in that case.
+  }
+}
 
 export const groupTitleClass =
   "font-display text-lg font-semibold text-ink sm:text-xl";

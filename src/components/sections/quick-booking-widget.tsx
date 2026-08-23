@@ -22,6 +22,7 @@ import {
   Field,
   fieldCopy,
   inputClass,
+  openDatePicker,
 } from "@/components/booking/field";
 import type { ServiceOption } from "@/lib/services/types";
 
@@ -34,12 +35,13 @@ export type BookingDentistOption = {
   defaultServiceSlug: string;
 };
 
-const steps = ["VISIT", "DETAILS"] as const;
+const steps = ["VISIT", "IDENTITY", "COVERAGE"] as const;
 type BookingStep = (typeof steps)[number];
 
 const stepLabels: Record<BookingStep, string> = {
   VISIT: "Visit",
-  DETAILS: "Your details",
+  IDENTITY: "You",
+  COVERAGE: "Coverage",
 };
 
 const stepFields: Record<BookingStep, AppointmentField[]> = {
@@ -50,7 +52,7 @@ const stepFields: Record<BookingStep, AppointmentField[]> = {
     "preferredDate",
     "preferredTime",
   ],
-  DETAILS: [
+  IDENTITY: [
     "firstName",
     "middleName",
     "noMiddleName",
@@ -58,6 +60,8 @@ const stepFields: Record<BookingStep, AppointmentField[]> = {
     "suffix",
     "email",
     "phone",
+  ],
+  COVERAGE: [
     "coverageType",
     "hmoProvider",
     "hmoMemberId",
@@ -226,55 +230,67 @@ export function QuickBookingWidget({
     });
   };
 
-  const onSubmit = handleSubmit((data, event) => {
-    const formData = new FormData();
-    formData.set("channel", "website");
+  const onSubmit = handleSubmit(
+    (data, event) => {
+      const formData = new FormData();
+      formData.set("channel", "website");
 
-    for (const [key, value] of Object.entries(data)) {
-      if (value === undefined || value === "") continue;
-      if (
-        key === "isNewPatient" ||
-        key === "noMiddleName" ||
-        key === "privacyConsent"
-      ) {
-        if (value) formData.set(key, "on");
-        continue;
-      }
-      formData.set(key, String(value));
-    }
-
-    const native = event?.target;
-    if (native instanceof HTMLFormElement) {
-      for (const kind of ["hmoCardFront", "hmoCardBack", "governmentId"]) {
-        const input = native.elements.namedItem(kind);
-        if (input instanceof HTMLInputElement && input.files?.[0]) {
-          formData.set(kind, input.files[0]);
+      for (const [key, value] of Object.entries(data)) {
+        if (value === undefined || value === "") continue;
+        if (
+          key === "isNewPatient" ||
+          key === "noMiddleName" ||
+          key === "privacyConsent"
+        ) {
+          if (value) formData.set(key, "on");
+          continue;
         }
+        formData.set(key, String(value));
       }
-    }
 
-    startTransition(async () => {
-      const result = await submitAppointment(initialAppointmentState, formData);
-      setServerState(result);
-
-      if (result.status === "error") {
-        for (const [field, message] of Object.entries(result.fieldErrors)) {
-          if (message) {
-            setError(field as AppointmentField, {
-              type: "server",
-              message,
-            });
+      const native = event?.target;
+      if (native instanceof HTMLFormElement) {
+        for (const kind of ["hmoCardFront", "hmoCardBack", "governmentId"]) {
+          const input = native.elements.namedItem(kind);
+          if (input instanceof HTMLInputElement && input.files?.[0]) {
+            formData.set(kind, input.files[0]);
           }
         }
-        const firstInvalidStep = steps.find((candidate) =>
-          stepFields[candidate].some(
-            (field) => result.fieldErrors[field] !== undefined,
-          ),
-        );
-        if (firstInvalidStep) setStep(firstInvalidStep);
       }
-    });
-  });
+
+      startTransition(async () => {
+        const result = await submitAppointment(initialAppointmentState, formData);
+        setServerState(result);
+
+        if (result.status === "error") {
+          for (const [field, message] of Object.entries(result.fieldErrors)) {
+            if (message) {
+              setError(field as AppointmentField, {
+                type: "server",
+                message,
+              });
+            }
+          }
+          const firstInvalidStep = steps.find((candidate) =>
+            stepFields[candidate].some(
+              (field) => result.fieldErrors[field] !== undefined,
+            ),
+          );
+          if (Object.keys(result.documentErrors ?? {}).length > 0) {
+            setStep("COVERAGE");
+          } else if (firstInvalidStep) {
+            setStep(firstInvalidStep);
+          }
+        }
+      });
+    },
+    (invalidFields) => {
+      const firstInvalidStep = steps.find((candidate) =>
+        stepFields[candidate].some((field) => invalidFields[field] !== undefined),
+      );
+      if (firstInvalidStep) setStep(firstInvalidStep);
+    },
+  );
 
   if (serverState.status === "success") {
     return (
@@ -322,12 +338,12 @@ export function QuickBookingWidget({
               Quick Booking
             </p>
             <h2 className="mt-5 font-display text-3xl leading-[1.1] font-semibold tracking-[0.01em] text-ink uppercase sm:text-4xl lg:text-5xl">
-              Request your visit in two steps.
+              Request your visit in three short steps.
             </h2>
             <p className="mt-6 max-w-xl leading-relaxed text-muted">
-              Pick the slot first, then send the same identity and coverage
-              details as the full booking form. Front desk reviews that file
-              before confirming by SMS.
+              Pick the slot, tell us who you are, then send your coverage
+              details. Front desk reviews the same complete request before
+              confirming by SMS.
             </p>
 
             <p className="mt-8 rounded-2xl bg-mint/40 p-5 text-sm leading-relaxed text-muted ring-1 ring-teal/20">
@@ -344,7 +360,7 @@ export function QuickBookingWidget({
           >
             <ol
               aria-label="Booking progress"
-              className="grid grid-cols-2 border-b border-ink/10 bg-sand/40"
+              className="grid grid-cols-3 border-b border-ink/10 bg-sand/40"
             >
               {steps.map((item, index) => {
                 const isCurrent = item === step;
@@ -367,7 +383,7 @@ export function QuickBookingWidget({
                       {isComplete ? "✓" : index + 1}
                     </span>
                     <span
-                      className={`mt-2 hidden text-xs font-semibold sm:block ${
+                      className={`mt-2 block text-[0.6875rem] font-semibold sm:text-xs ${
                         isCurrent ? "text-ink" : "text-muted"
                       }`}
                     >
@@ -381,7 +397,7 @@ export function QuickBookingWidget({
             <div className="min-h-96 px-5 py-6 sm:p-8">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
-                  key={step}
+                  key={step === "VISIT" ? "VISIT" : "VERIFICATION"}
                   initial={reduceMotion ? false : { opacity: 0, x: 18 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={reduceMotion ? undefined : { opacity: 0, x: -18 }}
@@ -392,7 +408,8 @@ export function QuickBookingWidget({
                   </p>
                   <h3 className="mt-2 font-display text-2xl font-semibold text-ink">
                     {step === "VISIT" && "Choose your visit"}
-                    {step === "DETAILS" && "Confirm your identity"}
+                    {step === "IDENTITY" && "Tell us who you are"}
+                    {step === "COVERAGE" && "Verify your coverage"}
                   </h3>
 
                   {step === "VISIT" && (
@@ -509,6 +526,7 @@ export function QuickBookingWidget({
                           <input
                             id="quick-booking-date"
                             type="date"
+                            onClick={openDatePicker}
                             className={`${inputClass} tabular-nums`}
                             aria-invalid={Boolean(errors.preferredDate)}
                             aria-describedby={describedBy(
@@ -548,9 +566,15 @@ export function QuickBookingWidget({
                       </div>
                     </div>
                   )}
-                  {step === "DETAILS" && (
+                  {step !== "VISIT" && (
                     <div className="mt-7 space-y-8">
-                      <div className="rounded-2xl bg-sand/40 p-4">
+                      <div
+                        className={
+                          step === "IDENTITY"
+                            ? "rounded-2xl bg-sand/40 p-4"
+                            : "hidden"
+                        }
+                      >
                         <p className="text-xs font-semibold tracking-[0.18em] text-muted uppercase">
                           Your request
                         </p>
@@ -586,6 +610,9 @@ export function QuickBookingWidget({
                           privacyConsent: errors.privacyConsent?.message,
                         }}
                         documentErrors={serverState.documentErrors}
+                        activeSection={
+                          step === "IDENTITY" ? "identity" : "coverage"
+                        }
                         coverageType={values.coverageType ?? "self-pay"}
                         noMiddleName={Boolean(values.noMiddleName)}
                         firstName={nameField("firstName")}
@@ -635,7 +662,7 @@ export function QuickBookingWidget({
                 Back
               </button>
 
-              {step === "DETAILS" ? (
+              {step === "COVERAGE" ? (
                 <div className="sm:text-right">
                   <button
                     type="submit"
