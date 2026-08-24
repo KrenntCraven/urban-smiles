@@ -13,7 +13,11 @@ export const metadata: Metadata = {
     "Request a visit at any Urban Smiles branch. Front desk verifies the request; once approved, the slot is confirmed automatically.",
 };
 
-export default async function BookPage(props: PageProps<"/book">) {
+type BookPageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export default async function BookPage(props: BookPageProps) {
   const prefill = parseBookingPrefill(await props.searchParams);
   const dentist = resolveDentistId(prefill.dentist ?? prefill.id);
   const service = prefill.service

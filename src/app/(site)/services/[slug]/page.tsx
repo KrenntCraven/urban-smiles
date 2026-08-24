@@ -14,12 +14,16 @@ import { serviceCategoryLabels } from "@/lib/services/types";
 
 export const dynamicParams = false;
 
+type ServicePageProps = {
+  params: Promise<{ slug: string }>;
+};
+
 export function generateStaticParams() {
   return getAllServiceSlugs().map((slug) => ({ slug }));
 }
 
 export async function generateMetadata(
-  props: PageProps<"/services/[slug]">,
+  props: ServicePageProps,
 ): Promise<Metadata> {
   const { slug } = await props.params;
   const service = getServiceBySlug(slug);
@@ -34,7 +38,7 @@ export async function generateMetadata(
 }
 
 export default async function ServiceDetailPage(
-  props: PageProps<"/services/[slug]">,
+  props: ServicePageProps,
 ) {
   const { slug } = await props.params;
   const service = getServiceBySlug(slug);
