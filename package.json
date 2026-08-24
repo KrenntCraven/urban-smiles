@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup:supabase": "npx tsx scripts/setup-supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
+    "@supabase/supabase-js": "^2.112.4",
     "framer-motion": "^13.1.1",
     "iron-session": "^8.0.4",
     "next": "16.3.1",

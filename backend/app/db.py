@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import Base
+from .supabase_store import supabase_configured
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -23,4 +24,6 @@ def get_db() -> Session:
 
 
 def init_db() -> None:
+    if supabase_configured():
+        return
     Base.metadata.create_all(bind=engine)

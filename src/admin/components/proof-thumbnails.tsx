@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminProof } from "@/admin/types";
 import type { DocumentKind } from "@/lib/booking/records";
 
@@ -24,21 +24,30 @@ export function ProofThumbnails({ proofs }: { proofs: AdminProof[] }) {
 
   return (
     <>
-      <ul className="flex flex-wrap gap-2">
+      {/*
+        IDs and HMO cards are landscape, so a square crop threw away both edges
+        of the document. The wider box is sized to fit two side by side in the
+        table column, and stays larger on the card layout where there is room.
+      */}
+      <ul className="flex flex-wrap gap-x-3 gap-y-2">
         {proofs.map((proof, index) => (
           <li key={proof.kind}>
             <button
               type="button"
               onClick={() => setOpenIndex(index)}
-              title={PROOF_LABEL[proof.kind]}
-              className="group block size-14 overflow-hidden rounded-lg ring-1 ring-ink/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+              className="group block w-32 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal xl:w-[5.5rem]"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- admin cookie is not sent through the image optimizer */}
-              <img
-                src={proof.url}
-                alt={`Open ${PROOF_LABEL[proof.kind]}`}
-                className="size-full bg-sand object-cover transition-transform group-hover:scale-105"
-              />
+              <span className="block aspect-[8/5] overflow-hidden rounded-lg ring-1 ring-ink/10">
+                {/* eslint-disable-next-line @next/next/no-img-element -- admin cookie is not sent through the image optimizer */}
+                <img
+                  src={proof.url}
+                  alt={`Open ${PROOF_LABEL[proof.kind]}`}
+                  className="size-full bg-sand object-cover transition-transform group-hover:scale-105"
+                />
+              </span>
+              <span className="mt-1 block truncate text-left text-xs text-muted group-hover:text-teal">
+                {PROOF_LABEL[proof.kind]}
+              </span>
             </button>
           </li>
         ))}
@@ -66,7 +75,6 @@ function ProofLightbox({
   onIndex: (index: number) => void;
   onClose: () => void;
 }) {
-  const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const [zoomStep, setZoomStep] = useState(0);
   const [rotation, setRotation] = useState(0);
@@ -109,7 +117,7 @@ function ProofLightbox({
       className="fixed inset-0 z-50 flex items-center justify-center overscroll-contain bg-ink/70 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-labelledby={titleId}
+      aria-label={PROOF_LABEL[proof.kind]}
       onClick={onClose}
     >
       <div
@@ -117,17 +125,9 @@ function ProofLightbox({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-ink/10 px-2 py-1.5 sm:px-3">
-          <h2
-            id={titleId}
-            className="min-w-0 flex-1 truncate px-2 text-sm font-semibold text-ink"
-          >
-            {PROOF_LABEL[proof.kind]}
-            {proofs.length > 1 ? (
-              <span className="ml-2 font-normal text-muted tabular-nums">
-                {index + 1} of {proofs.length}
-              </span>
-            ) : null}
-          </h2>
+          <p className="min-w-0 flex-1 truncate px-2 text-sm text-muted tabular-nums">
+            {proofs.length > 1 ? `${index + 1} of ${proofs.length}` : null}
+          </p>
 
           <div className="flex shrink-0 items-center">
             {proofs.length > 1 ? (
@@ -198,9 +198,14 @@ function ProofLightbox({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-ink/5">
-          <div className="flex min-h-full min-w-full items-center justify-center p-3 sm:p-4">
+          {/*
+            Centering happens through auto margins rather than justify-center:
+            a centered flex item that overflows cannot be scrolled back to its
+            leading edge, which hid the left side of a zoomed ID.
+          */}
+          <div className="flex min-h-full min-w-full p-3 sm:p-4">
             {failed ? (
-              <p className="max-w-sm text-center text-sm leading-relaxed text-muted">
+              <p className="m-auto max-w-sm text-center text-sm leading-relaxed text-muted">
                 This file could not be displayed. It may have been uploaded in a
                 format the browser cannot render.
               </p>
@@ -208,7 +213,7 @@ function ProofLightbox({
               /* eslint-disable-next-line @next/next/no-img-element -- admin cookie is not sent through the image optimizer */
               <img
                 src={proof.url}
-                alt={`${PROOF_LABEL[proof.kind]} — ${proof.filename}`}
+                alt={PROOF_LABEL[proof.kind]}
                 draggable={false}
                 onError={() => setFailed(true)}
                 style={{
@@ -218,7 +223,9 @@ function ProofLightbox({
                   width: zoom === 1 ? undefined : `${zoom * 100}%`,
                   maxWidth: zoom === 1 ? undefined : "none",
                 }}
-                className={`object-contain transition-transform ${
+                // shrink-0 keeps the flex parent from collapsing the zoomed
+                // width straight back to the visible area.
+                className={`m-auto shrink-0 object-contain transition-transform ${
                   zoom > 1
                     ? ""
                     : rotated
@@ -229,10 +236,6 @@ function ProofLightbox({
             )}
           </div>
         </div>
-
-        <p className="shrink-0 truncate border-t border-ink/10 px-4 py-2 text-xs text-muted">
-          {proof.filename}
-        </p>
       </div>
     </div>
   );

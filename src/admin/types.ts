@@ -32,6 +32,7 @@ export type AdminBooking = {
   isNewPatient: boolean;
   notes: string | null;
   submittedAt: string;
+  decidedAt: string | null;
   status: AdminBookingStatus;
   proofs: AdminProof[];
   reviewNote?: string;
@@ -44,6 +45,36 @@ export type AdminBookingQuery = {
   sort?: "date_asc" | "date_desc";
 };
 
+export type AdminStatusCounts = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+};
+
+export type AdminBranchSummary = AdminStatusCounts & {
+  id: string;
+  name: string;
+};
+
+export type AdminDecisionPeriod = {
+  approved: number;
+  rejected: number;
+};
+
+export type AdminPeriodSummary = {
+  week: AdminDecisionPeriod;
+  month: AdminDecisionPeriod;
+  year: AdminDecisionPeriod;
+};
+
+export type AdminBookingSummary = AdminStatusCounts & {
+  branches: AdminBranchSummary[];
+  busiestTotal: number;
+  periods: AdminPeriodSummary;
+};
+
 export type AdminBookingList = {
   items: AdminBooking[];
+  summary: AdminBookingSummary;
 };

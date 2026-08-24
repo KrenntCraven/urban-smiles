@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import ColumnElement, Select, String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -11,6 +11,12 @@ from ..auth import require_admin
 from ..db import get_db
 from ..models import Booking, BookingFile, BookingStatus
 from ..schemas import AdminBookingOut, BookingListOut, ProofOut, RejectIn
+from ..supabase_store import (
+    download_file as supabase_download_file,
+    list_rows as supabase_list_rows,
+    set_status as supabase_set_status,
+    supabase_configured,
+)
 
 router = APIRouter(prefix="/api/v1/admin/bookings", tags=["admin-bookings"])
 
@@ -43,6 +49,7 @@ def serialize(booking: Booking) -> AdminBookingOut:
             for file in booking.files
         ],
         review_note=booking.review_note,
+        decided_at=booking.decided_at,
     )
 
 
@@ -119,7 +126,9 @@ def load_booking(db: Session, booking_id: str) -> Booking:
 def list_bookings(
     _: str = Depends(require_admin),
     db: Session = Depends(get_db),
-    status_filter: Optional[Literal["pending", "approved", "rejected"]] = Query(
+    status_filter: Optional[
+        Literal["pending", "approved", "rejected", "all"]
+    ] = Query(
         default="pending",
         alias="status",
     ),
@@ -127,10 +136,18 @@ def list_bookings(
     branch: Optional[str] = None,
     sort: Literal["date_asc", "date_desc"] = "date_desc",
 ) -> BookingListOut:
+    if supabase_configured():
+        try:
+            return supabase_list_rows(status_filter, q, branch, sort)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except Exception as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+
     stmt: Select[tuple[Booking]] = select(Booking).options(
         selectinload(Booking.files)
     )
-    if status_filter:
+    if status_filter and status_filter != "all":
         stmt = stmt.where(Booking.status == status_filter)
     if branch:
         stmt = stmt.where(Booking.branch_id == branch)
@@ -155,6 +172,14 @@ def approve_booking(
     _: str = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> AdminBookingOut:
+    if supabase_configured():
+        try:
+            return supabase_set_status(booking_id, "approved", None)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except Exception as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+
     booking = load_booking(db, booking_id)
     booking.status = BookingStatus.approved.value
     booking.review_note = None
@@ -171,6 +196,16 @@ def reject_booking(
     _: str = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> AdminBookingOut:
+    if supabase_configured():
+        try:
+            return supabase_set_status(
+                booking_id, "rejected", payload.reason.strip()
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except Exception as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+
     booking = load_booking(db, booking_id)
     booking.status = BookingStatus.rejected.value
     booking.review_note = payload.reason.strip()
@@ -186,7 +221,23 @@ def booking_file(
     kind: str,
     _: str = Depends(require_admin),
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> FileResponse | Response:
+    if supabase_configured():
+        try:
+            payload, mime, filename = supabase_download_file(booking_id, kind)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except Exception as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+        return Response(
+            content=payload,
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
+        )
+
     file = db.scalar(
         select(BookingFile).where(
             BookingFile.booking_id == booking_id,

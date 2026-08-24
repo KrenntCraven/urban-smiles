@@ -1,12 +1,13 @@
 import type { AppointmentInput } from "@/lib/booking/schema";
 import { clinicToday, formatPatientName } from "@/lib/booking/schema";
-import type { BookingRecord } from "@/lib/booking/records";
+import type { BookingRecord, BookingStatus } from "@/lib/booking/records";
 import {
   listBookings,
   saveBooking,
   toStoredDocument,
 } from "@/lib/booking/store";
-import type { FileBlob } from "@/lib/booking/store";
+import type { FileBlob } from "@/lib/booking/blobs";
+import { supabaseConfigured } from "@/lib/supabase/admin";
 import {
   governmentIdCard,
   hmoCardBack,
@@ -35,6 +36,8 @@ function hoursAgo(hours: number): string {
 type Sample = {
   reference: string;
   submittedHoursAgo: number;
+  status?: BookingStatus;
+  reviewNote?: string;
   appointment: AppointmentInput;
   documents: Partial<
     Record<"governmentId" | "hmoCardFront" | "hmoCardBack", FileBlob>
@@ -176,30 +179,200 @@ function samples(): Sample[] {
         }),
       },
     },
+    {
+      reference: "US-5LM88C",
+      submittedHoursAgo: 6,
+      status: "approved",
+      appointment: {
+        serviceSlug: "routine-cleaning",
+        firstName: "Paolo",
+        middleName: "Cruz",
+        noMiddleName: false,
+        surname: "Mendoza",
+        email: "paolo.mendoza@example.ph",
+        phone: "09178880011",
+        locationId: "bgc",
+        preferredDate: dateIn(3),
+        preferredTime: "09:00",
+        coverageType: "self-pay",
+        privacyConsent: true,
+        isNewPatient: false,
+        channel: "website",
+      },
+      documents: {
+        governmentId: governmentIdCard({
+          surname: "MENDOZA",
+          givenNames: "PAOLO",
+          middleName: "CRUZ",
+          birthDate: "1988-02-19",
+          sex: "M",
+          address: "22 McKinley Pkwy, Taguig City",
+          idNumber: "5510 2291 7740",
+        }),
+      },
+    },
+    {
+      reference: "US-8HT21K",
+      submittedHoursAgo: 10,
+      appointment: {
+        serviceSlug: "teeth-whitening",
+        firstName: "Isabelle",
+        middleName: "Santos",
+        noMiddleName: false,
+        surname: "Garcia",
+        email: "isabelle.garcia@example.ph",
+        phone: "09271230044",
+        locationId: "bgc",
+        preferredDate: dateIn(5),
+        preferredTime: "14:00",
+        coverageType: "self-pay",
+        privacyConsent: true,
+        isNewPatient: true,
+        channel: "website",
+      },
+      documents: {
+        governmentId: governmentIdCard({
+          surname: "GARCIA",
+          givenNames: "ISABELLE",
+          middleName: "SANTOS",
+          birthDate: "1996-07-08",
+          sex: "F",
+          address: "5 26th Street, Taguig City",
+          idNumber: "8821 0046 1193",
+        }),
+      },
+    },
+    {
+      reference: "US-3VR09P",
+      submittedHoursAgo: 10,
+      status: "rejected",
+      reviewNote: "HMO card photo is unreadable. Ask the patient to resubmit.",
+      appointment: {
+        serviceSlug: "routine-cleaning",
+        firstName: "Miguel",
+        middleName: "Ramos",
+        noMiddleName: false,
+        surname: "Santos",
+        email: "miguel.santos@example.ph",
+        phone: "09190007721",
+        locationId: "makati",
+        preferredDate: dateIn(2),
+        preferredTime: "11:00",
+        coverageType: "hmo",
+        hmoProvider: "Medicard",
+        hmoMemberId: "MC-440192",
+        privacyConsent: true,
+        isNewPatient: false,
+        channel: "website",
+      },
+      documents: {
+        hmoCardFront: hmoCardFront({
+          provider: "Medicard",
+          memberName: "MIGUEL R. SANTOS",
+          memberId: "MC-440192",
+          plan: "Prime",
+          validUntil: "03/2027",
+        }),
+      },
+    },
+    {
+      reference: "US-6JY44W",
+      submittedHoursAgo: 45 * 24,
+      status: "approved",
+      appointment: {
+        serviceSlug: "routine-cleaning",
+        firstName: "Helena",
+        noMiddleName: true,
+        surname: "Reyes",
+        email: "helena.reyes@example.ph",
+        phone: "09173334455",
+        locationId: "ortigas",
+        preferredDate: dateIn(12),
+        preferredTime: "10:00",
+        coverageType: "self-pay",
+        privacyConsent: true,
+        isNewPatient: false,
+        channel: "website",
+      },
+      documents: {
+        governmentId: governmentIdCard({
+          surname: "REYES",
+          givenNames: "HELENA",
+          middleName: "—",
+          birthDate: "1984-09-21",
+          sex: "F",
+          address: "14 Emerald Ave., Pasig City",
+          idNumber: "2201 8834 5560",
+        }),
+      },
+    },
+    {
+      reference: "US-1QP70D",
+      submittedHoursAgo: 400 * 24,
+      status: "rejected",
+      reviewNote: "Name on the ID does not match the booking.",
+      appointment: {
+        serviceSlug: "teeth-whitening",
+        firstName: "Ramon",
+        middleName: "Dela",
+        noMiddleName: false,
+        surname: "Cruz",
+        email: "ramon.cruz@example.ph",
+        phone: "09280001122",
+        locationId: "qc",
+        preferredDate: dateIn(20),
+        preferredTime: "16:00",
+        coverageType: "self-pay",
+        privacyConsent: true,
+        isNewPatient: true,
+        channel: "website",
+      },
+      documents: {
+        governmentId: governmentIdCard({
+          surname: "CRUZ",
+          givenNames: "RAMON",
+          middleName: "DELA",
+          birthDate: "1979-01-03",
+          sex: "M",
+          address: "41 Maginhawa St., Quezon City",
+          idNumber: "1188 4402 7731",
+        }),
+      },
+    },
   ];
 }
 
 let seeded = false;
 
-export function ensureDemoBookings(): void {
+export async function ensureDemoBookings(): Promise<void> {
+  if (supabaseConfigured()) return;
   if (!demoSeedEnabled() || seeded) return;
   seeded = true;
-  if (listBookings().length > 0) return;
+  if ((await listBookings()).length > 0) return;
 
   for (const sample of samples()) {
     const documents = sample.documents;
+    const status = sample.status ?? "pending_verification";
     const record: BookingRecord = {
       reference: sample.reference,
-      status: "pending_verification",
+      status,
       createdAt: hoursAgo(sample.submittedHoursAgo),
       appointment: sample.appointment,
       documents: Object.entries(documents).map(([kind, blob]) =>
         toStoredDocument(kind as keyof typeof documents, blob),
       ),
       staffInbox: `${formatPatientName(sample.appointment)} submitted ID/HMO documents for ${sample.appointment.preferredDate} ${sample.appointment.preferredTime}.`,
+      review:
+        status === "pending_verification"
+          ? undefined
+          : {
+              decidedAt: hoursAgo(Math.max(1, sample.submittedHoursAgo - 4)),
+              decision: status,
+              note: sample.reviewNote,
+            },
     };
 
-    saveBooking(record, {
+    await saveBooking(record, {
       hmoCardFront: documents.hmoCardFront,
       hmoCardBack: documents.hmoCardBack,
       governmentId: documents.governmentId,

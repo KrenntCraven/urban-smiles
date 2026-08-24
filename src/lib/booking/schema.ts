@@ -57,8 +57,7 @@ const TIME_24H = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Philippine mobile: 09171234567 or +639171234567, after separators are stripped. */
 export const PH_MOBILE = /^(?:\+63|0)9\d{9}$/;
 /** Practical contact email — local@domain.tld, no spaces. */
-export const CONTACT_EMAIL =
-  /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+export const CONTACT_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 export const contactMessages = {
   phone: "Use a mobile number like 09171234567.",
@@ -78,10 +77,7 @@ export function phoneError(value: string): string | undefined {
     : contactMessages.phone;
 }
 
-export function emailError(
-  value: string,
-  required = true,
-): string | undefined {
+export function emailError(value: string, required = true): string | undefined {
   const email = value.trim();
   if (!email) return required ? contactMessages.email : undefined;
   return CONTACT_EMAIL.test(email) ? undefined : contactMessages.email;
@@ -167,12 +163,10 @@ export const appointmentSchema = z
     }),
     hmoProvider: z.enum(HMO_PROVIDERS).optional(),
     hmoMemberId: z.string().trim().max(40).optional(),
-    privacyConsent: z
-      .boolean()
-      .refine((value) => value === true, {
-        error:
-          "Consent is required before we can store your ID or HMO information.",
-      }),
+    privacyConsent: z.boolean().refine((value) => value === true, {
+      error:
+        "Consent is required before we can store your ID or HMO information.",
+    }),
     isNewPatient: z.boolean(),
     notes: z
       .string()
@@ -294,7 +288,12 @@ export function formatPatientName(
   >,
 ): string {
   const middle = appointment.noMiddleName ? undefined : appointment.middleName;
-  return [appointment.firstName, middle, appointment.surname, appointment.suffix]
+  return [
+    appointment.firstName,
+    middle,
+    appointment.surname,
+    appointment.suffix,
+  ]
     .filter(Boolean)
     .join(" ");
 }

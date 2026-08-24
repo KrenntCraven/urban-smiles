@@ -4,10 +4,13 @@ import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ProofThumbnails } from "@/admin/components/proof-thumbnails";
 import { RejectDialog } from "@/admin/components/reject-dialog";
+import { VerificationOverview } from "@/admin/components/verification-overview";
+import { applyStatusChange } from "@/admin/summary";
 import type {
   AdminBooking,
   AdminBookingQuery,
   AdminBookingStatus,
+  AdminBookingSummary,
 } from "@/admin/types";
 
 const fieldClass =
@@ -114,15 +117,18 @@ function Coverage({ booking }: { booking: AdminBooking }) {
 export function AdminBookingsDashboard({
   initialItems,
   initialQuery,
+  initialSummary,
   branches,
 }: {
   initialItems: AdminBooking[];
   initialQuery: AdminBookingQuery;
+  initialSummary: AdminBookingSummary;
   branches: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const [items, setItems] = useState(initialItems);
+  const [summary, setSummary] = useState(initialSummary);
   const [query, setQuery] = useState(initialQuery);
   const [search, setSearch] = useState(initialQuery.q ?? "");
   const [error, setError] = useState<string>();
@@ -169,6 +175,7 @@ export function AdminBookingsDashboard({
       .then(async (response) => {
         const body = (await response.json()) as {
           items?: AdminBooking[];
+          summary?: AdminBookingSummary;
           detail?: string;
         };
         if (!response.ok) {
@@ -176,6 +183,7 @@ export function AdminBookingsDashboard({
           return;
         }
         setItems(body.items ?? []);
+        if (body.summary) setSummary(body.summary);
         setError(undefined);
       })
       .catch((cause: unknown) => {
@@ -199,19 +207,32 @@ export function AdminBookingsDashboard({
     action: "approve" | "reject",
     reason?: string,
   ) {
+    const nextStatus: AdminBookingStatus =
+      action === "approve" ? "approved" : "rejected";
     const previous = items;
+    const previousSummary = summary;
     setBusyId(booking.id);
     setError(undefined);
+    setSummary(
+      applyStatusChange(summary, booking.branchId, booking.status, nextStatus),
+    );
     setItems((current) =>
-      current.map((row) =>
-        row.id === booking.id
-          ? {
-              ...row,
-              status: action === "approve" ? "approved" : "rejected",
-              reviewNote: reason,
-            }
-          : row,
-      ),
+      current
+        .map((row) =>
+          row.id === booking.id
+            ? {
+                ...row,
+                status: nextStatus,
+                reviewNote: reason,
+              }
+            : row,
+        )
+        .filter((row) => {
+          if (query.status && query.status !== "all") {
+            return row.status === query.status;
+          }
+          return true;
+        }),
     );
 
     try {
@@ -231,18 +252,27 @@ export function AdminBookingsDashboard({
       };
       if (!response.ok) {
         setItems(previous);
+        setSummary(previousSummary);
         const message = body.detail ?? "That action did not complete.";
         if (action === "reject") setRejectError(message);
         else setError(message);
         return;
       }
       setItems((current) =>
-        current.map((row) => (row.id === booking.id ? body : row)),
+        current
+          .map((row) => (row.id === booking.id ? body : row))
+          .filter((row) => {
+            if (query.status && query.status !== "all") {
+              return row.status === query.status;
+            }
+            return true;
+          }),
       );
       setRejectTarget(null);
       setRejectError(undefined);
     } catch {
       setItems(previous);
+      setSummary(previousSummary);
       setError("That action did not complete.");
     } finally {
       setBusyId(undefined);
@@ -255,321 +285,364 @@ export function AdminBookingsDashboard({
   }
 
   return (
-    <div className="space-y-6">
-      <form
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_14rem_14rem]"
-        onSubmit={(event) => event.preventDefault()}
-      >
-        <label className="block sm:col-span-2 lg:col-span-1">
-          <span className="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink">
-            Search
-            {loading ? (
-              <span className="text-xs font-normal text-muted" role="status">
-                Searching…
-              </span>
-            ) : null}
-          </span>
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.currentTarget.value)}
-            placeholder="Name, mobile, email, reference, branch, service, HMO, or date"
-            className={fieldClass}
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink">
-            Branch
-          </span>
-          <select
-            className={fieldClass}
-            value={query.branch ?? ""}
-            onChange={(event) =>
-              applyQuery({
-                ...query,
-                branch: event.currentTarget.value || undefined,
-              })
-            }
-          >
-            <option value="">All branches</option>
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink">
-            Sort by visit
-          </span>
-          <select
-            className={fieldClass}
-            value={query.sort ?? "date_desc"}
-            onChange={(event) =>
-              applyQuery({
-                ...query,
-                sort: event.currentTarget.value as AdminBookingQuery["sort"],
-              })
-            }
-          >
-            <option value="date_desc">Newest first</option>
-            <option value="date_asc">Soonest first</option>
-          </select>
-        </label>
-      </form>
+    <div className="space-y-8">
+      <VerificationOverview
+        summary={summary}
+        query={query}
+        onFilter={applyQuery}
+      />
 
-      {error ? (
-        <p className="text-sm text-teal-dark" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {items.length === 0 ? (
-        <div className="rounded-2xl bg-cream p-6 ring-1 ring-ink/10 sm:p-8">
-          {query.q ? (
-            <>
-              <p className="text-sm text-muted sm:text-base">
-                Nothing matches{" "}
-                <span className="font-semibold text-ink">
-                  &ldquo;{query.q}&rdquo;
+      <section aria-label="Verification list" className="space-y-6">
+        <form
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_11rem_14rem_14rem]"
+          onSubmit={(event) => event.preventDefault()}
+        >
+          <label className="block sm:col-span-2 xl:col-span-1">
+            <span className="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink">
+              Search
+              {loading ? (
+                <span className="text-xs font-normal text-muted" role="status">
+                  Searching…
                 </span>
-                . Try a surname, mobile number, reference, or HMO member ID.
-              </p>
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="mt-4 inline-flex min-h-11 items-center rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink transition-colors hover:border-teal hover:text-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-              >
-                Clear search
-              </button>
-            </>
-          ) : (
-            <p className="text-sm text-muted sm:text-base">
-              No bookings match these filters. New website requests appear here
-              as pending.
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className={loading ? "opacity-60 transition-opacity" : undefined}>
-          <ul className="space-y-4 xl:hidden">
-            {items.map((booking) => (
-              <li
-                key={booking.id}
-                className="rounded-2xl bg-cream p-5 ring-1 ring-ink/10"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <p className="font-semibold wrap-break-word text-ink">
-                        {booking.patientName}
-                      </p>
-                      {booking.isNewPatient ? <NewPatientChip /> : null}
-                    </div>
-                    <p className="mt-1 text-xs text-muted">
-                      <span className="tabular-nums">{booking.id}</span> · sent{" "}
-                      {formatSubmitted(booking.submittedAt)}
-                    </p>
-                  </div>
-                  <StatusChip status={booking.status} />
-                </div>
+              ) : null}
+            </span>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.currentTarget.value)}
+              placeholder="Name, mobile, email, reference, branch, service, HMO, or date"
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">
+              Branch
+            </span>
+            <select
+              className={fieldClass}
+              value={query.branch ?? ""}
+              onChange={(event) =>
+                applyQuery({
+                  ...query,
+                  branch: event.currentTarget.value || undefined,
+                })
+              }
+            >
+              <option value="">All branches</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">
+              Status
+            </span>
+            <select
+              className={fieldClass}
+              value={query.status ?? "pending"}
+              onChange={(event) =>
+                applyQuery({
+                  ...query,
+                  status: event.currentTarget
+                    .value as AdminBookingQuery["status"],
+                })
+              }
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="all">All requests</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">
+              Sort by visit
+            </span>
+            <select
+              className={fieldClass}
+              value={query.sort ?? "date_desc"}
+              onChange={(event) =>
+                applyQuery({
+                  ...query,
+                  sort: event.currentTarget.value as AdminBookingQuery["sort"],
+                })
+              }
+            >
+              <option value="date_desc">Newest first</option>
+              <option value="date_asc">Soonest first</option>
+            </select>
+          </label>
+        </form>
 
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className={termClass}>Visit</dt>
-                    <dd className="mt-1 text-ink tabular-nums">
-                      {formatVisit(
-                        booking.appointmentDate,
-                        booking.appointmentTime,
-                      )}
-                    </dd>
+        <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
+          Request list
+        </h2>
+
+        {error ? (
+          <p className="text-sm text-teal-dark" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {items.length === 0 ? (
+          <div className="rounded-2xl bg-cream p-6 ring-1 ring-ink/10 sm:p-8">
+            {query.q ? (
+              <>
+                <p className="text-sm text-muted sm:text-base">
+                  Nothing matches{" "}
+                  <span className="font-semibold text-ink">
+                    &ldquo;{query.q}&rdquo;
+                  </span>
+                  . Try a surname, mobile number, reference, or HMO member ID.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="mt-4 inline-flex min-h-11 items-center rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink transition-colors hover:border-teal hover:text-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+                >
+                  Clear search
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-muted sm:text-base">
+                No bookings match these filters. Open Pending, Approved, or
+                Rejected above, or pick a branch to see its queue.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div
+            className={loading ? "opacity-60 transition-opacity" : undefined}
+          >
+            <ul className="space-y-4 xl:hidden">
+              {items.map((booking) => (
+                <li
+                  key={booking.id}
+                  className="rounded-2xl bg-cream p-5 ring-1 ring-ink/10"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="font-semibold wrap-break-word text-ink">
+                          {booking.patientName}
+                        </p>
+                        {booking.isNewPatient ? <NewPatientChip /> : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted">
+                        <span className="tabular-nums">{booking.id}</span> ·
+                        sent {formatSubmitted(booking.submittedAt)}
+                      </p>
+                    </div>
+                    <StatusChip status={booking.status} />
                   </div>
-                  <div>
-                    <dt className={termClass}>Branch</dt>
-                    <dd className="mt-1 text-ink">{booking.branchName}</dd>
-                  </div>
-                  <div>
-                    <dt className={termClass}>Service</dt>
-                    <dd className="mt-1 text-ink">{booking.serviceName}</dd>
-                  </div>
-                  <div>
-                    <dt className={termClass}>Contact</dt>
-                    <dd className="mt-1 wrap-break-word text-ink">
-                      <span className="tabular-nums">{booking.phone}</span>
-                      <br />
-                      {booking.email ?? "No email"}
-                    </dd>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <dt className={termClass}>Coverage</dt>
-                    <dd className="mt-1">
-                      <Coverage booking={booking} />
-                    </dd>
-                  </div>
-                  {booking.notes ? (
-                    <div className="sm:col-span-2">
-                      <dt className={termClass}>Patient notes</dt>
-                      <dd className="mt-1 wrap-break-word text-ink">
-                        {booking.notes}
+
+                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className={termClass}>Visit</dt>
+                      <dd className="mt-1 text-ink tabular-nums">
+                        {formatVisit(
+                          booking.appointmentDate,
+                          booking.appointmentTime,
+                        )}
                       </dd>
                     </div>
+                    <div>
+                      <dt className={termClass}>Branch</dt>
+                      <dd className="mt-1 text-ink">{booking.branchName}</dd>
+                    </div>
+                    <div>
+                      <dt className={termClass}>Service</dt>
+                      <dd className="mt-1 text-ink">{booking.serviceName}</dd>
+                    </div>
+                    <div>
+                      <dt className={termClass}>Contact</dt>
+                      <dd className="mt-1 wrap-break-word text-ink">
+                        <span className="tabular-nums">{booking.phone}</span>
+                        <br />
+                        {booking.email ?? "No email"}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className={termClass}>Coverage</dt>
+                      <dd className="mt-1">
+                        <Coverage booking={booking} />
+                      </dd>
+                    </div>
+                    {booking.notes ? (
+                      <div className="sm:col-span-2">
+                        <dt className={termClass}>Patient notes</dt>
+                        <dd className="mt-1 wrap-break-word text-ink">
+                          {booking.notes}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+
+                  <div className="mt-4">
+                    <p className={termClass}>ID / HMO</p>
+                    <div className="mt-2">
+                      <ProofThumbnails proofs={booking.proofs} />
+                    </div>
+                  </div>
+
+                  {booking.status === "pending" ? (
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        disabled={busyId === booking.id}
+                        onClick={() => void decide(booking, "approve")}
+                        className={`flex-1 ${approveClass}`}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === booking.id}
+                        onClick={() => openReject(booking)}
+                        className={`flex-1 ${rejectClass}`}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ) : booking.reviewNote ? (
+                    <p className="mt-4 text-sm text-muted">
+                      {booking.reviewNote}
+                    </p>
                   ) : null}
-                </dl>
+                </li>
+              ))}
+            </ul>
 
-                <div className="mt-4">
-                  <p className={termClass}>ID / HMO</p>
-                  <div className="mt-2">
-                    <ProofThumbnails proofs={booking.proofs} />
-                  </div>
-                </div>
-
-                {booking.status === "pending" ? (
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      disabled={busyId === booking.id}
-                      onClick={() => void decide(booking, "approve")}
-                      className={`flex-1 ${approveClass}`}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyId === booking.id}
-                      onClick={() => openReject(booking)}
-                      className={`flex-1 ${rejectClass}`}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                ) : booking.reviewNote ? (
-                  <p className="mt-4 text-sm text-muted">
-                    {booking.reviewNote}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-
-          <div className="hidden overflow-x-auto rounded-2xl bg-cream ring-1 ring-ink/10 xl:block">
-            <table className="w-full min-w-6xl text-left text-sm">
+            <div className="hidden overflow-x-auto rounded-2xl bg-cream ring-1 ring-ink/10 xl:block">
               {/*
+              table-fixed makes the colgroup widths binding. Without it a long
+              email widens its own column and squeezes the ID / HMO previews.
+            */}
+              <table className="w-full min-w-6xl table-fixed text-left text-sm">
+                {/*
                 Widths are pinned so a long email or service name cannot starve
                 the patient column; the browser's content-based sizing made the
                 grid shift every time the filters changed the result set.
               */}
-              <colgroup>
-                <col className="w-[20%]" />
-                <col className="w-[16%]" />
-                <col className="w-[15%]" />
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
-                <col className="w-[10%]" />
-                <col className="w-[13%]" />
-              </colgroup>
-              <thead className="border-b border-ink/10 text-xs tracking-[0.16em] text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Patient</th>
-                  <th className="px-4 py-3 font-semibold">Contact</th>
-                  <th className="px-4 py-3 font-semibold">Visit</th>
-                  <th className="px-4 py-3 font-semibold">Coverage</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">
-                    ID / HMO
-                  </th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((booking) => (
-                  <Fragment key={booking.id}>
-                    <tr
-                      className={`align-top ${booking.notes ? "" : "border-b border-ink/5 last:border-0"}`}
-                    >
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p className="font-semibold wrap-break-word text-ink">
-                            {booking.patientName}
-                          </p>
-                          {booking.isNewPatient ? <NewPatientChip /> : null}
-                        </div>
-                        <p className="mt-1 text-xs text-muted">
-                          <span className="tabular-nums">{booking.id}</span> ·
-                          sent {formatSubmitted(booking.submittedAt)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4 text-ink">
-                        <p className="tabular-nums">{booking.phone}</p>
-                        <p className="mt-1 wrap-break-word text-muted">
-                          {booking.email ?? "No email"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4 text-ink">
-                        <p className="tabular-nums">
-                          {formatVisit(
-                            booking.appointmentDate,
-                            booking.appointmentTime,
-                          )}
-                        </p>
-                        <p className="mt-1 text-muted">{booking.branchName}</p>
-                        <p className="mt-1 text-muted">{booking.serviceName}</p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Coverage booking={booking} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <ProofThumbnails proofs={booking.proofs} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <StatusChip status={booking.status} />
-                      </td>
-                      <td className="px-4 py-4">
-                        {booking.status === "pending" ? (
-                          <div className="flex w-full flex-col gap-2">
-                            <button
-                              type="button"
-                              disabled={busyId === booking.id}
-                              onClick={() => void decide(booking, "approve")}
-                              className={approveClass}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busyId === booking.id}
-                              onClick={() => openReject(booking)}
-                              className={rejectClass}
-                            >
-                              Reject
-                            </button>
+                <colgroup>
+                  <col className="w-[17%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
+                <thead className="border-b border-ink/10 text-xs tracking-[0.16em] text-muted uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Patient</th>
+                    <th className="px-4 py-3 font-semibold">Contact</th>
+                    <th className="px-4 py-3 font-semibold">Visit</th>
+                    <th className="px-4 py-3 font-semibold">Coverage</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">
+                      ID / HMO
+                    </th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((booking) => (
+                    <Fragment key={booking.id}>
+                      <tr
+                        className={`align-top ${booking.notes ? "" : "border-b border-ink/5 last:border-0"}`}
+                      >
+                        <td className="px-4 py-4">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <p className="font-semibold wrap-break-word text-ink">
+                              {booking.patientName}
+                            </p>
+                            {booking.isNewPatient ? <NewPatientChip /> : null}
                           </div>
-                        ) : booking.reviewNote ? (
-                          <p className="wrap-break-word text-xs text-muted">
-                            {booking.reviewNote}
-                          </p>
-                        ) : (
-                          <span className="text-xs text-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                    {booking.notes ? (
-                      <tr className="border-b border-ink/5 last:border-0">
-                        <td colSpan={7} className="px-4 pb-4">
-                          <p className={termClass}>Patient notes</p>
-                          <p className="mt-1 max-w-4xl text-ink">
-                            {booking.notes}
+                          <p className="mt-1 text-xs text-muted">
+                            <span className="tabular-nums">{booking.id}</span> ·
+                            sent {formatSubmitted(booking.submittedAt)}
                           </p>
                         </td>
+                        <td className="px-4 py-4 text-ink">
+                          <p className="tabular-nums">{booking.phone}</p>
+                          <p className="mt-1 wrap-break-word text-muted">
+                            {booking.email ?? "No email"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4 text-ink">
+                          <p className="tabular-nums">
+                            {formatVisit(
+                              booking.appointmentDate,
+                              booking.appointmentTime,
+                            )}
+                          </p>
+                          <p className="mt-1 text-muted">
+                            {booking.branchName}
+                          </p>
+                          <p className="mt-1 text-muted">
+                            {booking.serviceName}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Coverage booking={booking} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <ProofThumbnails proofs={booking.proofs} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <StatusChip status={booking.status} />
+                        </td>
+                        <td className="px-4 py-4">
+                          {booking.status === "pending" ? (
+                            <div className="flex w-full flex-col gap-2">
+                              <button
+                                type="button"
+                                disabled={busyId === booking.id}
+                                onClick={() => void decide(booking, "approve")}
+                                className={approveClass}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyId === booking.id}
+                                onClick={() => openReject(booking)}
+                                className={rejectClass}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : booking.reviewNote ? (
+                            <p className="wrap-break-word text-xs text-muted">
+                              {booking.reviewNote}
+                            </p>
+                          ) : (
+                            <span className="text-xs text-muted">—</span>
+                          )}
+                        </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+                      {booking.notes ? (
+                        <tr className="border-b border-ink/5 last:border-0">
+                          <td colSpan={7} className="px-4 pb-4">
+                            <p className={termClass}>Patient notes</p>
+                            <p className="mt-1 max-w-4xl text-ink">
+                              {booking.notes}
+                            </p>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </section>
 
       {rejectTarget ? (
         <RejectDialog

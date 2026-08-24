@@ -1,6 +1,6 @@
 import type { CoverageType } from "./schema";
 import type { DocumentKind } from "./records";
-import type { FileBlob } from "./store";
+import type { FileBlob } from "./blobs";
 
 export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_DOCUMENT_TYPES = [
@@ -61,9 +61,7 @@ export async function parseRequiredDocuments(
   return { ok: true, documents };
 }
 
-async function toBlob(
-  file: File,
-): Promise<FileBlob | { error: string }> {
+async function toBlob(file: File): Promise<FileBlob | { error: string }> {
   if (
     !ACCEPTED_DOCUMENT_TYPES.includes(
       file.type as (typeof ACCEPTED_DOCUMENT_TYPES)[number],

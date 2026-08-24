@@ -24,6 +24,10 @@ export type {
   AdminBookingList,
   AdminBookingQuery,
   AdminBookingStatus,
+  AdminBookingSummary,
+  AdminBranchSummary,
+  AdminDecisionPeriod,
+  AdminPeriodSummary,
   AdminProof,
 } from "./types";
 export { jsonError } from "./http";

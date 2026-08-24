@@ -7,7 +7,7 @@ import {
 } from "@/admin/service";
 
 export const adminBookingsMetadata: Metadata = {
-  title: "Pending bookings — Urban Smiles",
+  title: "Appointment verification — Urban Smiles",
   robots: { index: false, follow: false },
 };
 
@@ -23,7 +23,7 @@ export async function AdminBookingsPage({
   }
 
   const query = parseAdminQuery(params);
-  const { items } = await listAdminBookings(query);
+  const { items, summary } = await listAdminBookings(query);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
@@ -38,6 +38,7 @@ export async function AdminBookingsPage({
         <AdminBookingsDashboard
           initialItems={items}
           initialQuery={query}
+          initialSummary={summary}
           branches={adminBranches()}
         />
       </div>

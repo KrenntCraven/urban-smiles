@@ -22,7 +22,7 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const file = getDocument(reference, kind as DocumentKind);
+  const file = await getDocument(reference, kind as DocumentKind);
   if (!file) return new NextResponse("Not found", { status: 404 });
 
   return new NextResponse(Buffer.from(file.bytes), {

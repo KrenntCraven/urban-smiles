@@ -102,8 +102,7 @@ export async function submitAppointment(
   const coverageType = readString(formData, "coverageType") as CoverageType;
   const suffix = readOptional(formData, "suffix") as NameSuffix | undefined;
   const hmoProvider = readOptional(formData, "hmoProvider") as
-    | HmoProvider
-    | undefined;
+    HmoProvider | undefined;
 
   const raw: Record<string, string | undefined> = {
     serviceSlug: readString(formData, "serviceSlug"),
@@ -187,21 +186,31 @@ export async function submitAppointment(
     toStoredDocument(kind as keyof typeof documents.documents, blob!),
   );
 
-  saveBooking(
-    {
-      reference,
-      status: "pending_verification",
-      createdAt: new Date().toISOString(),
-      appointment: parsed.data,
-      documents: stored,
-      staffInbox: `${formatPatientName(parsed.data)} submitted ID/HMO documents for ${parsed.data.preferredDate} ${parsed.data.preferredTime}.`,
-    },
-    {
-      hmoCardFront: documents.documents.hmoCardFront,
-      hmoCardBack: documents.documents.hmoCardBack,
-      governmentId: documents.documents.governmentId,
-    },
-  );
+  try {
+    await saveBooking(
+      {
+        reference,
+        status: "pending_verification",
+        createdAt: new Date().toISOString(),
+        appointment: parsed.data,
+        documents: stored,
+        staffInbox: `${formatPatientName(parsed.data)} submitted ID/HMO documents for ${parsed.data.preferredDate} ${parsed.data.preferredTime}.`,
+      },
+      {
+        hmoCardFront: documents.documents.hmoCardFront,
+        hmoCardBack: documents.documents.hmoCardBack,
+        governmentId: documents.documents.governmentId,
+      },
+    );
+  } catch {
+    return {
+      status: "error",
+      fieldErrors: {},
+      formError:
+        "We could not store this request. Check the clinic database connection and try again.",
+      values: echo,
+    };
+  }
 
   return {
     status: "success",
@@ -232,11 +241,11 @@ export async function reviewBooking(
   if (decision !== "approved" && decision !== "rejected") {
     return { error: "Choose approve or reject." };
   }
-  if (!getBooking(reference)) {
+  if (!(await getBooking(reference))) {
     return { error: "That booking is no longer in the queue." };
   }
 
-  updateBookingStatus(reference, decision, note);
+  await updateBookingStatus(reference, decision, note);
   revalidatePath("/staff");
   return {};
 }

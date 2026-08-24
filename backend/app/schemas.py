@@ -30,6 +30,7 @@ class AdminBookingOut(BaseModel):
     status: Literal["pending", "approved", "rejected"]
     proofs: list[ProofOut]
     review_note: Optional[str] = None
+    decided_at: Optional[datetime] = None
 
 
 class BookingListOut(BaseModel):

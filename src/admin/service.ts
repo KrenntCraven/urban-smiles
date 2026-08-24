@@ -16,9 +16,11 @@ import {
   listBookings,
   updateBookingStatus,
 } from "@/lib/booking/store";
+import { supabaseConfigured } from "@/lib/supabase/admin";
 import { fetchFastApi, fetchFastApiFile } from "./fastapi";
 import { buildSearchIndex, matchesSearch } from "./search";
 import { ensureDemoBookings } from "./seed";
+import { summarizeBookings } from "./summary";
 import type {
   AdminBooking,
   AdminBookingList,
@@ -69,6 +71,7 @@ export function toAdminBooking(record: BookingRecord): AdminBooking {
     isNewPatient: appointment.isNewPatient,
     notes: appointment.notes ?? null,
     submittedAt: record.createdAt,
+    decidedAt: record.review?.decidedAt ?? null,
     status: toAdminStatus(record.status),
     proofs: record.documents.map((document) => ({
       kind: document.kind,
@@ -142,6 +145,10 @@ function normalizeRemote(payload: unknown): AdminBooking {
     submittedAt: String(
       row.submittedAt ?? row.submitted_at ?? row.created_at ?? "",
     ),
+    decidedAt:
+      (row.decidedAt as string | null | undefined) ??
+      (row.decided_at as string | null | undefined) ??
+      null,
     status: (row.status as AdminBookingStatus) ?? "pending",
     proofs,
     reviewNote: (row.reviewNote ?? row.review_note) as string | undefined,
@@ -161,36 +168,57 @@ export function parseAdminQuery(
   };
 }
 
+function rowsFromPayload(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  const body = payload as { items?: unknown[]; results?: unknown[] };
+  return body.items ?? body.results ?? [];
+}
+
+async function listFromFastApi(
+  query: AdminBookingQuery,
+): Promise<AdminBooking[]> {
+  const params = new URLSearchParams();
+  if (query.status && query.status !== "all") {
+    params.set("status", query.status);
+  } else {
+    params.set("status", "all");
+  }
+  if (query.q) params.set("q", query.q);
+  if (query.branch) params.set("branch", query.branch);
+  if (query.sort) params.set("sort", query.sort);
+  const payload = await fetchFastApi<unknown>(
+    `/api/v1/admin/bookings?${params.toString()}`,
+  );
+  return rowsFromPayload(payload).map(normalizeRemote);
+}
+
+async function listAllMapped(): Promise<AdminBooking[]> {
+  if (!supabaseConfigured() && fastapiConfigured()) {
+    return listFromFastApi({ status: "all", sort: "date_desc" });
+  }
+  await ensureDemoBookings();
+  return (await listBookings()).map(toAdminBooking);
+}
+
 export async function listAdminBookings(
   query: AdminBookingQuery,
 ): Promise<AdminBookingList> {
-  if (fastapiConfigured()) {
-    const params = new URLSearchParams();
-    if (query.status && query.status !== "all") {
-      params.set("status", query.status);
-    }
-    if (query.q) params.set("q", query.q);
-    if (query.branch) params.set("branch", query.branch);
-    if (query.sort) params.set("sort", query.sort);
-    const payload = await fetchFastApi<unknown>(
-      `/api/v1/admin/bookings?${params.toString()}`,
-    );
-    const rows = Array.isArray(payload)
-      ? payload
-      : ((payload as { items?: unknown[] }).items ??
-        (payload as { results?: unknown[] }).results ??
-        []);
-    return { items: rows.map(normalizeRemote) };
+  const branches = adminBranches();
+
+  if (!supabaseConfigured() && fastapiConfigured()) {
+    const [items, all] = await Promise.all([
+      listFromFastApi(query),
+      listAllMapped(),
+    ]);
+    return { items, summary: summarizeBookings(all, branches) };
   }
 
-  ensureDemoBookings();
+  const all = await listAllMapped();
   const items = sortBookings(
-    listBookings()
-      .map(toAdminBooking)
-      .filter((booking) => matchesQuery(booking, query)),
+    all.filter((booking) => matchesQuery(booking, query)),
     query.sort,
   );
-  return { items };
+  return { items, summary: summarizeBookings(all, branches) };
 }
 
 function bumpAdminCaches() {
@@ -199,7 +227,7 @@ function bumpAdminCaches() {
 }
 
 export async function approveAdminBooking(id: string): Promise<AdminBooking> {
-  if (fastapiConfigured()) {
+  if (!supabaseConfigured() && fastapiConfigured()) {
     const payload = await fetchFastApi<unknown>(
       `/api/v1/admin/bookings/${encodeURIComponent(id)}/approve`,
       { method: "POST" },
@@ -208,7 +236,7 @@ export async function approveAdminBooking(id: string): Promise<AdminBooking> {
     return normalizeRemote(payload);
   }
 
-  const updated = updateBookingStatus(id, "approved");
+  const updated = await updateBookingStatus(id, "approved");
   if (!updated) {
     throw new AdminServiceError("Booking not found.", 404);
   }
@@ -225,7 +253,7 @@ export async function rejectAdminBooking(
     throw new AdminServiceError("Add a short reason for the patient.", 400);
   }
 
-  if (fastapiConfigured()) {
+  if (!supabaseConfigured() && fastapiConfigured()) {
     const payload = await fetchFastApi<unknown>(
       `/api/v1/admin/bookings/${encodeURIComponent(id)}/reject`,
       {
@@ -237,7 +265,7 @@ export async function rejectAdminBooking(
     return normalizeRemote(payload);
   }
 
-  const updated = updateBookingStatus(id, "rejected", note);
+  const updated = await updateBookingStatus(id, "rejected", note);
   if (!updated) {
     throw new AdminServiceError("Booking not found.", 404);
   }
@@ -248,14 +276,14 @@ export async function rejectAdminBooking(
 export async function readAdminDocument(id: string, kind: DocumentKind) {
   if (!DOCUMENT_KINDS.includes(kind)) return undefined;
 
-  if (fastapiConfigured()) {
+  if (!supabaseConfigured() && fastapiConfigured()) {
     return fetchFastApiFile(
       `/api/v1/admin/bookings/${encodeURIComponent(id)}/files/${kind}`,
     );
   }
 
-  ensureDemoBookings();
-  if (!getBooking(id)) return undefined;
+  await ensureDemoBookings();
+  if (!(await getBooking(id))) return undefined;
   return getDocument(id, kind);
 }
 

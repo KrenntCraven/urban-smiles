@@ -38,7 +38,7 @@ export default async function StaffPage() {
                 Sign out
               </button>
             </form>
-            <StaffQueue bookings={listBookings()} />
+            <StaffQueue bookings={await listBookings()} />
           </>
         ) : (
           <div className="max-w-sm rounded-2xl bg-cream p-6 ring-1 ring-ink/10 sm:p-8">
