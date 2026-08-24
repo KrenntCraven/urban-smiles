@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { AdminLoginForm } from "@/admin/components/login-form";
 
+/** /admin/login — unauthenticated only; middleware redirects signed-in users away. */
+
 export const adminLoginMetadata: Metadata = {
   title: "Admin sign in — Urban Smiles",
   robots: { index: false, follow: false },

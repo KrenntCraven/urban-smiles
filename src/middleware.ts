@@ -1,3 +1,7 @@
+/**
+ * Next.js middleware entry. Matcher must stay a static array here — Turbopack
+ * cannot follow an imported constant for `config.matcher`.
+ */
 import { protectAdmin } from "@/admin/protect";
 
 export const middleware = protectAdmin;

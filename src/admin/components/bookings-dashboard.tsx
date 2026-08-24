@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Appointment verification UI: dashboard chips, search, card/table list,
+ * approve (waits for Gmail invite), reject with reason.
+ */
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ProofThumbnails } from "@/admin/components/proof-thumbnails";
@@ -98,6 +102,28 @@ function NewPatientChip() {
  * Front desk is checking the uploaded card against what the patient typed, so
  * the provider and member ID have to sit next to the coverage type.
  */
+/** Shown after approve: guest address + patient name, or a warning if the event id is missing. */
+function InviteNote({ booking }: { booking: AdminBooking }) {
+  if (booking.status !== "approved") return null;
+  if (booking.calendarEventId && booking.email) {
+    return (
+      <p className="mt-2 wrap-break-word text-xs text-muted">
+        Gmail invite sent to {booking.email} as {booking.patientName}.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 text-xs text-teal-dark">
+      Approved, but no calendar event id is stored. Do not treat this as
+      confirmed on the clinic calendar.
+    </p>
+  );
+}
+
+/**
+ * Front desk is checking the uploaded card against what the patient typed, so
+ * the provider and member ID have to sit next to the coverage type.
+ */
 function Coverage({ booking }: { booking: AdminBooking }) {
   if (booking.coverageType !== "hmo") {
     return <span className="text-ink">Self-pay</span>;
@@ -119,11 +145,13 @@ export function AdminBookingsDashboard({
   initialQuery,
   initialSummary,
   branches,
+  calendarReady,
 }: {
   initialItems: AdminBooking[];
   initialQuery: AdminBookingQuery;
   initialSummary: AdminBookingSummary;
   branches: { id: string; name: string }[];
+  calendarReady: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -209,31 +237,41 @@ export function AdminBookingsDashboard({
   ) {
     const nextStatus: AdminBookingStatus =
       action === "approve" ? "approved" : "rejected";
-    const previous = items;
-    const previousSummary = summary;
     setBusyId(booking.id);
     setError(undefined);
-    setSummary(
-      applyStatusChange(summary, booking.branchId, booking.status, nextStatus),
-    );
-    setItems((current) =>
-      current
-        .map((row) =>
-          row.id === booking.id
-            ? {
-                ...row,
-                status: nextStatus,
-                reviewNote: reason,
-              }
-            : row,
-        )
-        .filter((row) => {
-          if (query.status && query.status !== "all") {
-            return row.status === query.status;
-          }
-          return true;
-        }),
-    );
+
+    // Approve waits for the calendar invite. Marking it approved in the UI
+    // before Google responds would show a confirmed visit with no event.
+    const previous = items;
+    const previousSummary = summary;
+    if (action === "reject") {
+      setSummary(
+        applyStatusChange(
+          summary,
+          booking.branchId,
+          booking.status,
+          nextStatus,
+        ),
+      );
+      setItems((current) =>
+        current
+          .map((row) =>
+            row.id === booking.id
+              ? {
+                  ...row,
+                  status: nextStatus,
+                  reviewNote: reason,
+                }
+              : row,
+          )
+          .filter((row) => {
+            if (query.status && query.status !== "all") {
+              return row.status === query.status;
+            }
+            return true;
+          }),
+      );
+    }
 
     try {
       const response = await fetch(
@@ -251,28 +289,46 @@ export function AdminBookingsDashboard({
         detail?: string;
       };
       if (!response.ok) {
-        setItems(previous);
-        setSummary(previousSummary);
+        if (action === "reject") {
+          setItems(previous);
+          setSummary(previousSummary);
+        }
         const message = body.detail ?? "That action did not complete.";
         if (action === "reject") setRejectError(message);
         else setError(message);
         return;
       }
-      setItems((current) =>
-        current
-          .map((row) => (row.id === booking.id ? body : row))
-          .filter((row) => {
-            if (query.status && query.status !== "all") {
-              return row.status === query.status;
-            }
-            return true;
-          }),
-      );
+      if (action === "approve") {
+        setSummary(
+          applyStatusChange(
+            summary,
+            booking.branchId,
+            booking.status,
+            nextStatus,
+          ),
+        );
+      }
+      setItems((current) => {
+        const merged = current.map((row) =>
+          row.id === booking.id ? body : row,
+        );
+        const withRow = merged.some((row) => row.id === booking.id)
+          ? merged
+          : [body, ...merged];
+        return withRow.filter((row) => {
+          if (query.status && query.status !== "all") {
+            return row.status === query.status;
+          }
+          return true;
+        });
+      });
       setRejectTarget(null);
       setRejectError(undefined);
     } catch {
-      setItems(previous);
-      setSummary(previousSummary);
+      if (action === "reject") {
+        setItems(previous);
+        setSummary(previousSummary);
+      }
       setError("That action did not complete.");
     } finally {
       setBusyId(undefined);
@@ -291,6 +347,17 @@ export function AdminBookingsDashboard({
         query={query}
         onFilter={applyQuery}
       />
+
+      {calendarReady ? null : (
+        <p
+          className="rounded-2xl bg-sand/40 p-4 text-sm leading-relaxed text-ink ring-1 ring-ink/10"
+          role="status"
+        >
+          Approvals are blocked until Google Calendar is configured
+          (GOOGLE_CALENDAR_ID and a service account). A booking stays pending if
+          the invite cannot be created.
+        </p>
+      )}
 
       <section aria-label="Verification list" className="space-y-6">
         <form
@@ -497,6 +564,7 @@ export function AdminBookingsDashboard({
                         className={`flex-1 ${approveClass}`}
                       >
                         Approve
+                        {busyId === booking.id ? " — sending invite" : ""}
                       </button>
                       <button
                         type="button"
@@ -507,11 +575,16 @@ export function AdminBookingsDashboard({
                         Reject
                       </button>
                     </div>
-                  ) : booking.reviewNote ? (
-                    <p className="mt-4 text-sm text-muted">
-                      {booking.reviewNote}
-                    </p>
-                  ) : null}
+                  ) : (
+                    <>
+                      {booking.reviewNote ? (
+                        <p className="mt-4 text-sm text-muted">
+                          {booking.reviewNote}
+                        </p>
+                      ) : null}
+                      <InviteNote booking={booking} />
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -606,6 +679,9 @@ export function AdminBookingsDashboard({
                                 className={approveClass}
                               >
                                 Approve
+                                {busyId === booking.id
+                                  ? " — sending invite"
+                                  : ""}
                               </button>
                               <button
                                 type="button"
@@ -616,12 +692,15 @@ export function AdminBookingsDashboard({
                                 Reject
                               </button>
                             </div>
-                          ) : booking.reviewNote ? (
-                            <p className="wrap-break-word text-xs text-muted">
-                              {booking.reviewNote}
-                            </p>
                           ) : (
-                            <span className="text-xs text-muted">—</span>
+                            <div>
+                              {booking.reviewNote ? (
+                                <p className="wrap-break-word text-xs text-muted">
+                                  {booking.reviewNote}
+                                </p>
+                              ) : null}
+                              <InviteNote booking={booking} />
+                            </div>
                           )}
                         </td>
                       </tr>

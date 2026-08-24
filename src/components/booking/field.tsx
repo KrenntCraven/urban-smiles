@@ -1,3 +1,7 @@
+/**
+ * Shared booking field chrome (labels, input classes, coverage copy).
+ * Keep styling here so /book and quick booking do not drift.
+ */
 import type { MouseEvent, ReactNode } from "react";
 import {
   ACCEPTED_DOCUMENT_TYPES,

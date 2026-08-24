@@ -5,6 +5,9 @@ import {
   listAdminBookings,
   parseAdminQuery,
 } from "@/admin/service";
+import { calendarConfigured } from "@/lib/calendar/google";
+
+/** /admin/bookings — loads the queue and whether Google Calendar is configured. */
 
 export const adminBookingsMetadata: Metadata = {
   title: "Appointment verification — Urban Smiles",
@@ -31,8 +34,9 @@ export async function AdminBookingsPage({
         Appointment verification
       </h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">
-        Review government IDs and HMO cards. Approving a request confirms the
-        visit automatically.
+        Review government IDs and HMO cards. Approving sends a Gmail calendar
+        invite in the patient&apos;s name and only then marks the visit
+        confirmed.
       </p>
       <div className="mt-6 sm:mt-8">
         <AdminBookingsDashboard
@@ -40,6 +44,7 @@ export async function AdminBookingsPage({
           initialQuery={query}
           initialSummary={summary}
           branches={adminBranches()}
+          calendarReady={calendarConfigured()}
         />
       </div>
     </div>

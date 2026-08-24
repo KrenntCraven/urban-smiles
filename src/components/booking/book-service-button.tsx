@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Service-page CTA. Desktop can open the shared form in a dialog; mobile
+ * goes to /book with the service pre-selected so nested scroll is avoided.
+ */
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { MouseEvent } from "react";
@@ -119,10 +123,7 @@ export function BookServiceButton({
 
         <div className="px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:pb-6">
           {isOpen ? (
-            <AppointmentForm
-              services={services}
-              defaults={{ serviceSlug }}
-            />
+            <AppointmentForm services={services} defaults={{ serviceSlug }} />
           ) : null}
         </div>
       </dialog>

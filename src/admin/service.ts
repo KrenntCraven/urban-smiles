@@ -1,3 +1,10 @@
+/**
+ * Admin bookings service: list, filter, search, approve, reject.
+ *
+ * Prefers Supabase when configured, then FastAPI, then the in-memory store.
+ * Approve always goes through approveBookingWithInvite except on the FastAPI
+ * path, which the FastAPI app must implement itself.
+ */
 import { revalidatePath } from "next/cache";
 import { getServiceBySlug } from "@/lib/services/catalog";
 import {
@@ -5,6 +12,8 @@ import {
   getLocationName,
   LOCATIONS,
 } from "@/lib/booking/schema";
+import { approveBookingWithInvite } from "@/lib/booking/approve";
+import { CalendarInviteError } from "@/lib/calendar/google";
 import type {
   BookingRecord,
   BookingStatus,
@@ -41,6 +50,7 @@ export function fastapiConfigured(): boolean {
   );
 }
 
+/** Maps a stored booking (pending_verification | approved | rejected) to admin chips. */
 function toAdminStatus(status: BookingStatus): AdminBookingStatus {
   return status === "pending_verification" ? "pending" : status;
 }
@@ -49,6 +59,7 @@ function proofUrl(id: string, kind: DocumentKind): string {
   return `/api/v1/admin/bookings/${encodeURIComponent(id)}/files/${kind}`;
 }
 
+/** Flattens a stored booking into the dashboard row (proofs, coverage, visit). */
 export function toAdminBooking(record: BookingRecord): AdminBooking {
   const { appointment } = record;
   return {
@@ -79,6 +90,7 @@ export function toAdminBooking(record: BookingRecord): AdminBooking {
       url: proofUrl(record.reference, document.kind),
     })),
     reviewNote: record.review?.note,
+    calendarEventId: record.calendarEventId,
   };
 }
 
@@ -152,9 +164,13 @@ function normalizeRemote(payload: unknown): AdminBooking {
     status: (row.status as AdminBookingStatus) ?? "pending",
     proofs,
     reviewNote: (row.reviewNote ?? row.review_note) as string | undefined,
+    calendarEventId: (row.calendarEventId ??
+      row.calendar_event_id ??
+      undefined) as string | undefined,
   };
 }
 
+/** Reads status, search, branch, and sort from the dashboard query string. */
 export function parseAdminQuery(
   searchParams: URLSearchParams,
 ): AdminBookingQuery {
@@ -200,6 +216,10 @@ async function listAllMapped(): Promise<AdminBooking[]> {
   return (await listBookings()).map(toAdminBooking);
 }
 
+/**
+ * Queue plus dashboard totals. Summary is always unfiltered (all statuses);
+ * `items` respects the current search / branch / status chips.
+ */
 export async function listAdminBookings(
   query: AdminBookingQuery,
 ): Promise<AdminBookingList> {
@@ -226,6 +246,10 @@ function bumpAdminCaches() {
   revalidatePath("/staff");
 }
 
+/**
+ * Admin Approve button. Never marks approved itself — that happens only inside
+ * approveBookingWithInvite after the Gmail calendar invite exists.
+ */
 export async function approveAdminBooking(id: string): Promise<AdminBooking> {
   if (!supabaseConfigured() && fastapiConfigured()) {
     const payload = await fetchFastApi<unknown>(
@@ -236,14 +260,19 @@ export async function approveAdminBooking(id: string): Promise<AdminBooking> {
     return normalizeRemote(payload);
   }
 
-  const updated = await updateBookingStatus(id, "approved");
-  if (!updated) {
-    throw new AdminServiceError("Booking not found.", 404);
+  try {
+    const updated = await approveBookingWithInvite(id);
+    bumpAdminCaches();
+    return toAdminBooking(updated);
+  } catch (error) {
+    if (error instanceof CalendarInviteError) {
+      throw new AdminServiceError(error.message, error.status);
+    }
+    throw error;
   }
-  bumpAdminCaches();
-  return toAdminBooking(updated);
 }
 
+/** Reject does not touch Google Calendar — pending rows have no event yet. */
 export async function rejectAdminBooking(
   id: string,
   reason: string,
@@ -287,6 +316,7 @@ export async function readAdminDocument(id: string, kind: DocumentKind) {
   return getDocument(id, kind);
 }
 
+/** Clinic locations from the public booking schema, used as the branch filter. */
 export function adminBranches() {
   return LOCATIONS.map((location) => ({
     id: location.id,

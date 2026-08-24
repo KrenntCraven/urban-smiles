@@ -1,3 +1,9 @@
+/**
+ * Edge middleware for /admin and /api/v1/admin.
+ *
+ * Unauthenticated HTML goes to /admin/login. Unauthenticated API calls get 401.
+ * Already-signed-in visits to /admin/login bounce to the bookings dashboard.
+ */
 import { getIronSession } from "iron-session";
 import { NextResponse, type NextRequest } from "next/server";
 import { sessionOptions, type AdminSession } from "./session";

@@ -1,5 +1,10 @@
 -- Urban Smiles bookings + private ID storage.
 -- Run in the Supabase SQL editor if the setup script cannot apply it.
+--
+-- bookings: public form submissions (pending_verification until approved).
+-- booking_files: metadata pointing at storage objects.
+-- government_id / hmo_id: private buckets for patient documents.
+-- calendar_event_id: Google event id, set only after events.insert succeeds.
 
 create table if not exists public.bookings (
   id text primary key,
@@ -23,12 +28,16 @@ create table if not exists public.bookings (
   decision text,
   staff_inbox text not null default '',
   appointment jsonb not null,
+  -- Google Calendar event id written only after events.insert succeeds.
+  calendar_event_id text,
   created_at timestamptz not null default now()
 );
 
 create index if not exists bookings_status_idx on public.bookings (status);
 create index if not exists bookings_branch_idx on public.bookings (branch_id);
 create index if not exists bookings_date_idx on public.bookings (appointment_date);
+
+alter table public.bookings add column if not exists calendar_event_id text;
 
 create table if not exists public.booking_files (
   id bigint generated always as identity primary key,

@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+/**
+ * Full /book wizard (visit → you → coverage on small screens).
+ * Submits through submitAppointment; files stay on the form until that action.
+ */
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import type { FocusEvent, MouseEvent, ReactNode } from "react";
 import { submitAppointment } from "@/lib/booking/actions";
 import {
@@ -69,9 +67,7 @@ function applyAppointmentStep(root: HTMLElement, step: MobileStep) {
     else panel.setAttribute("aria-hidden", "true");
 
     panel
-      .querySelectorAll<HTMLElement>(
-        "button, input, select, textarea, a[href]",
-      )
+      .querySelectorAll<HTMLElement>("button, input, select, textarea, a[href]")
       .forEach((control) => {
         if (!active) {
           if (!control.hasAttribute("data-step-tab-managed")) {
@@ -136,14 +132,18 @@ function AppointmentMobileProgress() {
       className="mb-8 grid grid-cols-3 overflow-hidden rounded-2xl bg-sand/40 ring-1 ring-ink/10 md:hidden"
     >
       {mobileSteps.map((item, index) => (
-          <li key={item} data-progress-step={item} className="px-2 py-3 text-center">
-            <span className="mx-auto flex size-8 items-center justify-center rounded-full bg-cream text-xs font-semibold text-muted ring-1 ring-ink/10 tabular-nums">
-              {index + 1}
-            </span>
-            <span className="mt-1.5 block text-xs font-semibold text-ink">
-              {mobileStepLabels[item]}
-            </span>
-          </li>
+        <li
+          key={item}
+          data-progress-step={item}
+          className="px-2 py-3 text-center"
+        >
+          <span className="mx-auto flex size-8 items-center justify-center rounded-full bg-cream text-xs font-semibold text-muted ring-1 ring-ink/10 tabular-nums">
+            {index + 1}
+          </span>
+          <span className="mt-1.5 block text-xs font-semibold text-ink">
+            {mobileStepLabels[item]}
+          </span>
+        </li>
       ))}
     </ol>
   );
@@ -308,184 +308,184 @@ export function AppointmentForm({
       ) : null}
 
       <AppointmentStepLayout requestedStep={requestedStep}>
-      <AppointmentMobileProgress />
+        <AppointmentMobileProgress />
 
-      <section
-        className="space-y-5"
-        data-booking-panel="visit"
-        data-show-from-tablet="true"
-      >
-        <h2 className={groupTitleClass}>{bookingCopy.visitGroup}</h2>
-        <Field
-          label={fieldCopy.locationId.label}
-          htmlFor={fieldId("locationId")}
-          error={errors.locationId}
+        <section
+          className="space-y-5"
+          data-booking-panel="visit"
+          data-show-from-tablet="true"
         >
-          <select
-            id={fieldId("locationId")}
-            name="locationId"
-            defaultValue={valueFor("locationId")}
-            aria-invalid={Boolean(errors.locationId)}
-            aria-describedby={describedBy("locationId")}
-            className={inputClass}
-          >
-            <option value="">Select a branch</option>
-            {LOCATIONS.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field
-          label={fieldCopy.serviceSlug.label}
-          htmlFor={fieldId("serviceSlug")}
-          error={errors.serviceSlug}
-        >
-          <select
-            id={fieldId("serviceSlug")}
-            name="serviceSlug"
-            defaultValue={valueFor("serviceSlug")}
-            aria-invalid={Boolean(errors.serviceSlug)}
-            aria-describedby={describedBy("serviceSlug")}
-            className={inputClass}
-          >
-            <option value="">Select a treatment</option>
-            {services.map((service) => (
-              <option key={service.slug} value={service.slug}>
-                {service.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <div className="grid gap-5 sm:grid-cols-2">
+          <h2 className={groupTitleClass}>{bookingCopy.visitGroup}</h2>
           <Field
-            label={fieldCopy.preferredDate.label}
-            htmlFor={fieldId("preferredDate")}
-            error={errors.preferredDate}
-          >
-            <input
-              ref={bindClinicDateMin}
-              id={fieldId("preferredDate")}
-              name="preferredDate"
-              type="date"
-              onClick={openDatePicker}
-              defaultValue={valueFor("preferredDate")}
-              aria-invalid={Boolean(errors.preferredDate)}
-              aria-describedby={describedBy("preferredDate")}
-              className={`${inputClass} tabular-nums`}
-            />
-          </Field>
-          <Field
-            label={fieldCopy.preferredTime.label}
-            htmlFor={fieldId("preferredTime")}
-            error={errors.preferredTime}
+            label={fieldCopy.locationId.label}
+            htmlFor={fieldId("locationId")}
+            error={errors.locationId}
           >
             <select
-              id={fieldId("preferredTime")}
-              name="preferredTime"
-              defaultValue={valueFor("preferredTime")}
-              aria-invalid={Boolean(errors.preferredTime)}
-              aria-describedby={describedBy("preferredTime")}
-              className={`${inputClass} tabular-nums`}
+              id={fieldId("locationId")}
+              name="locationId"
+              defaultValue={valueFor("locationId")}
+              aria-invalid={Boolean(errors.locationId)}
+              aria-describedby={describedBy("locationId")}
+              className={inputClass}
             >
-              <option value="">Select a time</option>
-              {TIME_SLOTS.map((slot) => (
-                <option key={slot} value={slot}>
-                  {slot}
+              <option value="">Select a branch</option>
+              {LOCATIONS.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
                 </option>
               ))}
             </select>
           </Field>
+
+          <Field
+            label={fieldCopy.serviceSlug.label}
+            htmlFor={fieldId("serviceSlug")}
+            error={errors.serviceSlug}
+          >
+            <select
+              id={fieldId("serviceSlug")}
+              name="serviceSlug"
+              defaultValue={valueFor("serviceSlug")}
+              aria-invalid={Boolean(errors.serviceSlug)}
+              aria-describedby={describedBy("serviceSlug")}
+              className={inputClass}
+            >
+              <option value="">Select a treatment</option>
+              {services.map((service) => (
+                <option key={service.slug} value={service.slug}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field
+              label={fieldCopy.preferredDate.label}
+              htmlFor={fieldId("preferredDate")}
+              error={errors.preferredDate}
+            >
+              <input
+                ref={bindClinicDateMin}
+                id={fieldId("preferredDate")}
+                name="preferredDate"
+                type="date"
+                onClick={openDatePicker}
+                defaultValue={valueFor("preferredDate")}
+                aria-invalid={Boolean(errors.preferredDate)}
+                aria-describedby={describedBy("preferredDate")}
+                className={`${inputClass} tabular-nums`}
+              />
+            </Field>
+            <Field
+              label={fieldCopy.preferredTime.label}
+              htmlFor={fieldId("preferredTime")}
+              error={errors.preferredTime}
+            >
+              <select
+                id={fieldId("preferredTime")}
+                name="preferredTime"
+                defaultValue={valueFor("preferredTime")}
+                aria-invalid={Boolean(errors.preferredTime)}
+                aria-describedby={describedBy("preferredTime")}
+                className={`${inputClass} tabular-nums`}
+              >
+                <option value="">Select a time</option>
+                {TIME_SLOTS.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {slot}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </section>
+
+        <PatientVerificationFields
+          idFor={fieldId}
+          errors={errors}
+          documentErrors={documentErrors}
+          activeSection="all"
+          showAllFromTablet
+          coverageType={coverageType}
+          coverageControlled
+          noMiddleName={noMiddleName}
+          firstName={{
+            name: "firstName",
+            defaultValue: valueFor("firstName"),
+            onBlur: applyNameCase,
+          }}
+          surname={{
+            name: "surname",
+            defaultValue: valueFor("surname"),
+            onBlur: applyNameCase,
+          }}
+          middleName={{
+            name: "middleName",
+            defaultValue: valueFor("middleName"),
+            onBlur: applyNameCase,
+          }}
+          suffix={{
+            name: "suffix",
+            defaultValue: valueFor("suffix"),
+          }}
+          phone={{
+            name: "phone",
+            defaultValue: valueFor("phone"),
+          }}
+          email={{
+            name: "email",
+            defaultValue: valueFor("email"),
+          }}
+          coverageTypeBind={{
+            name: "coverageType",
+            onChange: (event) =>
+              setCoverageType(event.currentTarget.value as CoverageType),
+          }}
+          hmoProvider={{
+            name: "hmoProvider",
+            defaultValue: valueFor("hmoProvider"),
+          }}
+          hmoMemberId={{
+            name: "hmoMemberId",
+            defaultValue: valueFor("hmoMemberId"),
+          }}
+          noMiddleNameBind={{
+            name: "noMiddleName",
+            checked: noMiddleName,
+            onChange: (event) => setNoMiddleName(event.currentTarget.checked),
+          }}
+          privacyConsent={{
+            name: "privacyConsent",
+            required: true,
+          }}
+          isNewPatient={{
+            name: "isNewPatient",
+            defaultChecked: true,
+          }}
+        />
+
+        {state.formError ? (
+          <p className="text-sm text-teal-dark" role="alert">
+            {state.formError}
+          </p>
+        ) : null}
+
+        <AppointmentMobileNavigation isPending={isPending} />
+
+        <div data-booking-desktop-submit className="hidden md:block">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex w-full items-center justify-center rounded-full bg-teal px-7 py-3.5 text-base font-semibold text-cream shadow-lg shadow-teal/20 transition-colors hover:bg-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isPending ? "Sending request…" : "Submit for verification"}
+          </button>
+          <p className="mt-3 text-center text-xs text-muted">
+            Status starts as pending verification · No payment today
+          </p>
         </div>
-      </section>
-
-      <PatientVerificationFields
-        idFor={fieldId}
-        errors={errors}
-        documentErrors={documentErrors}
-        activeSection="all"
-        showAllFromTablet
-        coverageType={coverageType}
-        coverageControlled
-        noMiddleName={noMiddleName}
-        firstName={{
-          name: "firstName",
-          defaultValue: valueFor("firstName"),
-          onBlur: applyNameCase,
-        }}
-        surname={{
-          name: "surname",
-          defaultValue: valueFor("surname"),
-          onBlur: applyNameCase,
-        }}
-        middleName={{
-          name: "middleName",
-          defaultValue: valueFor("middleName"),
-          onBlur: applyNameCase,
-        }}
-        suffix={{
-          name: "suffix",
-          defaultValue: valueFor("suffix"),
-        }}
-        phone={{
-          name: "phone",
-          defaultValue: valueFor("phone"),
-        }}
-        email={{
-          name: "email",
-          defaultValue: valueFor("email"),
-        }}
-        coverageTypeBind={{
-          name: "coverageType",
-          onChange: (event) =>
-            setCoverageType(event.currentTarget.value as CoverageType),
-        }}
-        hmoProvider={{
-          name: "hmoProvider",
-          defaultValue: valueFor("hmoProvider"),
-        }}
-        hmoMemberId={{
-          name: "hmoMemberId",
-          defaultValue: valueFor("hmoMemberId"),
-        }}
-        noMiddleNameBind={{
-          name: "noMiddleName",
-          checked: noMiddleName,
-          onChange: (event) => setNoMiddleName(event.currentTarget.checked),
-        }}
-        privacyConsent={{
-          name: "privacyConsent",
-          required: true,
-        }}
-        isNewPatient={{
-          name: "isNewPatient",
-          defaultChecked: true,
-        }}
-      />
-
-      {state.formError ? (
-        <p className="text-sm text-teal-dark" role="alert">
-          {state.formError}
-        </p>
-      ) : null}
-
-      <AppointmentMobileNavigation isPending={isPending} />
-
-      <div data-booking-desktop-submit className="hidden md:block">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex w-full items-center justify-center rounded-full bg-teal px-7 py-3.5 text-base font-semibold text-cream shadow-lg shadow-teal/20 transition-colors hover:bg-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {isPending ? "Sending request…" : "Submit for verification"}
-        </button>
-        <p className="mt-3 text-center text-xs text-muted">
-          Status starts as pending verification · No payment today
-        </p>
-      </div>
       </AppointmentStepLayout>
     </form>
   );

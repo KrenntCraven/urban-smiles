@@ -1,3 +1,7 @@
+/**
+ * Dashboard totals: pending/approved/rejected overall, per branch, and
+ * approved/rejected for this Manila week, month, and year.
+ */
 import { clinicToday } from "@/lib/booking/schema";
 import type {
   AdminBooking,
@@ -73,6 +77,7 @@ function bumpDecision(
   period[status] += 1;
 }
 
+/** Zeroed dashboard used before the first list response. */
 export function emptySummary(
   branches: { id: string; name: string }[],
 ): AdminBookingSummary {
@@ -85,6 +90,7 @@ export function emptySummary(
   };
 }
 
+/** Walks every booking once to fill overall counts, branch bars, and periods. */
 export function summarizeBookings(
   bookings: AdminBooking[],
   branches: { id: string; name: string }[],
@@ -151,6 +157,7 @@ function shiftPeriod(
   return next;
 }
 
+/** Optimistic dashboard math after approve/reject without refetching the list. */
 export function applyStatusChange(
   summary: AdminBookingSummary,
   branchId: string,

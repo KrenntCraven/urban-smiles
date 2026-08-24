@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+/**
+ * Public appointment contract — the single source of truth for every booking
+ * form (home widget, /book, service CTA). The server action validates against
+ * this schema; HTML `min`/`pattern` are convenience only.
+ *
+ * Covers visit (service, branch, date/time), identity (Pascal-case names),
+ * PH mobile + email, HMO vs self-pay, and privacy consent.
+ */
 export const LOCATIONS = [
   { id: "bgc", name: "BGC — High Street" },
   { id: "makati", name: "Makati — Legazpi Village" },

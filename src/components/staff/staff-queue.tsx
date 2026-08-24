@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * /staff queue: ID photos, approve (calendar invite) or reject with a note.
+ */
 import { useActionState } from "react";
 import { reviewBooking } from "@/lib/booking/actions";
 import { formatPatientName, getLocationName } from "@/lib/booking/schema";
@@ -15,8 +18,8 @@ export function StaffQueue({ bookings }: { bookings: BookingRecord[] }) {
   if (bookings.length === 0) {
     return (
       <p className="rounded-2xl bg-cream p-8 text-muted ring-1 ring-ink/10">
-        No booking requests yet. New website submissions appear here with
-        status pending verification.
+        No booking requests yet. New website submissions appear here with status
+        pending verification.
       </p>
     );
   }

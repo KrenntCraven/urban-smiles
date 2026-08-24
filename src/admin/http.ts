@@ -1,9 +1,19 @@
+/**
+ * JSON error helper for admin API routes.
+ * CalendarInviteError and AdminServiceError keep their message for the dashboard.
+ */
 import { NextResponse } from "next/server";
 import { AdminServiceError } from "./service";
 import { FastApiError } from "./fastapi";
+import { CalendarInviteError } from "@/lib/calendar/google";
 
+/** Maps known admin/calendar errors to `{ detail }` JSON; logs anything else. */
 export function jsonError(error: unknown) {
-  if (error instanceof AdminServiceError || error instanceof FastApiError) {
+  if (
+    error instanceof AdminServiceError ||
+    error instanceof FastApiError ||
+    error instanceof CalendarInviteError
+  ) {
     return NextResponse.json(
       { detail: error.message },
       { status: error.status },

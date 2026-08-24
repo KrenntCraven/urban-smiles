@@ -1,3 +1,7 @@
+/**
+ * Creates the government_id and hmo_id buckets if missing, then checks that
+ * public.bookings (including calendar_event_id) exists.
+ */
 import { readFileSync } from "node:fs";
 import {
   createSupabaseAdmin,
@@ -45,10 +49,13 @@ async function main() {
     console.log(`bucket ${bucket.id}: created`);
   }
 
-  const { error } = await supabase.from("bookings").select("id").limit(1);
+  const { error } = await supabase
+    .from("bookings")
+    .select("id, calendar_event_id")
+    .limit(1);
   if (error) {
     console.error(
-      "bookings table is missing. Run supabase/schema.sql in the Supabase SQL editor.",
+      "bookings table is missing or calendar_event_id is not on it. Run supabase/schema.sql in the Supabase SQL editor.",
     );
     console.error(error.message);
     process.exitCode = 1;

@@ -1,3 +1,9 @@
+/**
+ * Supabase persistence for bookings and private ID/HMO buckets.
+ *
+ * Rows live in public.bookings; photos in government_id / hmo_id storage.
+ * calendar_event_id is written only after Google Calendar insert succeeds.
+ */
 import { getServiceBySlug } from "@/lib/services/catalog";
 import { formatPatientName, getLocationName } from "@/lib/booking/schema";
 import type { AppointmentInput } from "@/lib/booking/schema";
@@ -37,6 +43,7 @@ type BookingRow = {
   decision: "approved" | "rejected" | null;
   staff_inbox: string;
   appointment: AppointmentInput;
+  calendar_event_id: string | null;
   created_at: string;
   booking_files?: FileRow[] | null;
 };
@@ -95,6 +102,7 @@ function toRecord(row: BookingRow): BookingRecord {
     })),
     staffInbox: row.staff_inbox,
     review,
+    calendarEventId: row.calendar_event_id ?? undefined,
   };
 }
 
@@ -125,6 +133,7 @@ function toRow(record: BookingRecord): Omit<BookingRow, "booking_files"> {
     decision: record.review?.decision ?? null,
     staff_inbox: record.staffInbox,
     appointment,
+    calendar_event_id: record.calendarEventId ?? null,
     created_at: record.createdAt,
   };
 }
@@ -135,6 +144,7 @@ function throwIfError(error: { message: string } | null, action: string) {
   }
 }
 
+/** Upsert the booking row, then upload each ID/HMO photo into its private bucket. */
 export async function saveBookingRemote(
   record: BookingRecord,
   documents: Record<DocumentKind, FileBlob | undefined>,
@@ -176,6 +186,7 @@ export async function saveBookingRemote(
   }
 }
 
+/** Newest submissions first, with nested booking_files for proof URLs. */
 export async function listBookingsRemote(): Promise<BookingRecord[]> {
   const supabase = createSupabaseAdmin();
   const { data, error } = await supabase
@@ -186,6 +197,7 @@ export async function listBookingsRemote(): Promise<BookingRecord[]> {
   return ((data ?? []) as BookingRow[]).map(toRecord);
 }
 
+/** One booking by reference, or undefined if it was never stored. */
 export async function getBookingRemote(
   reference: string,
 ): Promise<BookingRecord | undefined> {
@@ -199,6 +211,7 @@ export async function getBookingRemote(
   return data ? toRecord(data as BookingRow) : undefined;
 }
 
+/** Downloads one ID/HMO object from Storage for the staff or admin file route. */
 export async function getDocumentRemote(
   reference: string,
   kind: DocumentKind,
@@ -227,10 +240,15 @@ export async function getDocumentRemote(
   };
 }
 
+/**
+ * Persists status, review, and the Google event id on the bookings row.
+ * Called only after events.insert (on approve) or with no event id (on reject).
+ */
 export async function updateBookingStatusRemote(
   reference: string,
   decision: Exclude<BookingRecord["status"], "pending_verification">,
   note?: string,
+  calendarEventId?: string,
 ): Promise<BookingRecord | undefined> {
   const current = await getBookingRemote(reference);
   if (!current) return undefined;
@@ -243,6 +261,7 @@ export async function updateBookingStatusRemote(
       decision,
       note,
     },
+    calendarEventId: calendarEventId ?? current.calendarEventId,
   };
 
   const supabase = createSupabaseAdmin();
@@ -253,6 +272,7 @@ export async function updateBookingStatusRemote(
       decision,
       review_note: note ?? null,
       decided_at: next.review?.decidedAt,
+      calendar_event_id: next.calendarEventId ?? null,
     })
     .eq("id", reference);
   throwIfError(error, "Could not update the booking");

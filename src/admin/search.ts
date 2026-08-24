@@ -1,3 +1,8 @@
+/**
+ * Admin search: every token must match something on the row.
+ * Accents, punctuation, and PH mobile prefixes (+63 vs 0) are ignored so a
+ * name off an ID or a number read over the phone still finds the booking.
+ */
 import type { AdminBooking } from "./types";
 
 /**
@@ -33,6 +38,7 @@ export type SearchIndex = {
   digits: string[];
 };
 
+/** Pre-computed fields so each keystroke does not rebuild strings from the row. */
 export function buildSearchIndex(booking: AdminBooking): SearchIndex {
   return {
     text: [
@@ -61,6 +67,7 @@ export function buildSearchIndex(booking: AdminBooking): SearchIndex {
  * so "cruz maxicare" finds the Cruz record covered by Maxicare. Matching the
  * whole term against one concatenated string would only work in field order.
  */
+/** True when every query token matches name, contact, HMO, date, or digits. */
 export function matchesSearch(index: SearchIndex, term: string): boolean {
   const tokens = foldText(term).split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return true;

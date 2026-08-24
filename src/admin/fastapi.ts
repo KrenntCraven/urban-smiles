@@ -1,3 +1,7 @@
+/**
+ * Optional FastAPI backend. Used only when Supabase is not configured.
+ * Bearer ADMIN_API_TOKEN; paths match /api/v1/admin/bookings.
+ */
 export class FastApiError extends Error {
   constructor(
     message: string,

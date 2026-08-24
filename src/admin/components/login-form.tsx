@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Password form for /admin/login. Submits to loginAdmin (server action).
+ */
 import { useActionState } from "react";
 import { loginAdmin } from "@/admin/auth";
 

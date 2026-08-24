@@ -1,3 +1,7 @@
+/**
+ * Local demo patients for ADMIN_SEED_DEMO=1 when Supabase is off.
+ * Skipped in production-shaped deploys that have a real database.
+ */
 import type { AppointmentInput } from "@/lib/booking/schema";
 import { clinicToday, formatPatientName } from "@/lib/booking/schema";
 import type { BookingRecord, BookingStatus } from "@/lib/booking/records";

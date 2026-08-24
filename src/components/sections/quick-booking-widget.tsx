@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Home floating quick-book widget. Same schema and submitAppointment as /book.
+ */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState, useTransition } from "react";
@@ -61,12 +64,7 @@ const stepFields: Record<BookingStep, AppointmentField[]> = {
     "email",
     "phone",
   ],
-  COVERAGE: [
-    "coverageType",
-    "hmoProvider",
-    "hmoMemberId",
-    "privacyConsent",
-  ],
+  COVERAGE: ["coverageType", "hmoProvider", "hmoMemberId", "privacyConsent"],
 };
 
 function resolveDentist(
@@ -77,8 +75,7 @@ function resolveDentist(
   const normalized = value.trim().toLowerCase();
   return dentists.find(
     (dentist) =>
-      dentist.slug === normalized ||
-      dentist.slug.split("-")[0] === normalized,
+      dentist.slug === normalized || dentist.slug.split("-")[0] === normalized,
   );
 }
 
@@ -192,9 +189,7 @@ export function QuickBookingWidget({
       }
 
       const requestedLocation = source.searchParams.get("location");
-      if (
-        LOCATIONS.some((location) => location.id === requestedLocation)
-      ) {
+      if (LOCATIONS.some((location) => location.id === requestedLocation)) {
         setValue("locationId", requestedLocation as LocationId);
       }
 
@@ -259,7 +254,10 @@ export function QuickBookingWidget({
       }
 
       startTransition(async () => {
-        const result = await submitAppointment(initialAppointmentState, formData);
+        const result = await submitAppointment(
+          initialAppointmentState,
+          formData,
+        );
         setServerState(result);
 
         if (result.status === "error") {
@@ -286,7 +284,9 @@ export function QuickBookingWidget({
     },
     (invalidFields) => {
       const firstInvalidStep = steps.find((candidate) =>
-        stepFields[candidate].some((field) => invalidFields[field] !== undefined),
+        stepFields[candidate].some(
+          (field) => invalidFields[field] !== undefined,
+        ),
       );
       if (firstInvalidStep) setStep(firstInvalidStep);
     },
@@ -446,7 +446,10 @@ export function QuickBookingWidget({
                           ))}
                         </div>
                         {errors.locationId && (
-                          <p className="mt-3 text-xs text-teal-dark" role="alert">
+                          <p
+                            className="mt-3 text-xs text-teal-dark"
+                            role="alert"
+                          >
                             {errors.locationId.message}
                           </p>
                         )}
@@ -477,7 +480,10 @@ export function QuickBookingWidget({
                           ))}
                         </div>
                         {errors.serviceSlug && (
-                          <p className="mt-3 text-xs text-teal-dark" role="alert">
+                          <p
+                            className="mt-3 text-xs text-teal-dark"
+                            role="alert"
+                          >
                             {errors.serviceSlug.message}
                           </p>
                         )}
@@ -582,8 +588,7 @@ export function QuickBookingWidget({
                           {selectedService?.name} at{" "}
                           {
                             LOCATIONS.find(
-                              (location) =>
-                                location.id === values.locationId,
+                              (location) => location.id === values.locationId,
                             )?.name
                           }
                           , {values.preferredDate} at {values.preferredTime}

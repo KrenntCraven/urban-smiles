@@ -1,3 +1,4 @@
+/** Shell for every /admin route: no marketing header, no index. */
 export const adminRootMetadata = {
   robots: { index: false, follow: false },
 };

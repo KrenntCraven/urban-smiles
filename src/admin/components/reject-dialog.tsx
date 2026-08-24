@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Reason modal for Reject. The note is stored on the booking and can be shown
+ * to the patient later; it is required (min 3 characters) on the server.
+ */
 import { useEffect, useId, useRef } from "react";
 
 export function RejectDialog({

@@ -3,6 +3,8 @@ import { isStaffAuthenticated } from "@/lib/booking/actions";
 import type { DocumentKind } from "@/lib/booking/records";
 import { getDocument } from "@/lib/booking/store";
 
+/** Authenticated staff download of a stored ID/HMO photo. */
+
 const kinds = new Set<DocumentKind>([
   "hmoCardFront",
   "hmoCardBack",

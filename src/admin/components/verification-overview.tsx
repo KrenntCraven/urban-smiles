@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Status cards, per-branch volume, and week/month/year approved vs rejected.
+ * Clicking a card or branch writes the same query the list filters already use.
+ */
 import type {
   AdminBookingQuery,
   AdminBookingStatus,

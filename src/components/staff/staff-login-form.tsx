@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * /staff PIN form. Same pending queue as admin, lighter auth (STAFF_PIN).
+ */
 import { useActionState } from "react";
 import { loginStaff } from "@/lib/booking/actions";
 

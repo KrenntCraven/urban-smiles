@@ -1,3 +1,8 @@
+/**
+ * ID / HMO upload parsing for the booking action.
+ * HMO needs at least the front of the card; self-pay needs a government ID.
+ * Files stay in memory as FileBlob until store.ts persists them.
+ */
 import type { CoverageType } from "./schema";
 import type { DocumentKind } from "./records";
 import type { FileBlob } from "./blobs";

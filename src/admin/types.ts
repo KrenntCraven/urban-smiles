@@ -1,3 +1,7 @@
+/**
+ * Dashboard view-model. `pending` here is the public `pending_verification`.
+ * Periods (week/month/year) count approved vs rejected by decision date.
+ */
 import type { CoverageType } from "@/lib/booking/schema";
 import type { DocumentKind } from "@/lib/booking/records";
 
@@ -36,6 +40,8 @@ export type AdminBooking = {
   status: AdminBookingStatus;
   proofs: AdminProof[];
   reviewNote?: string;
+  /** Present after a successful invite; the admin list shows this next to Approved. */
+  calendarEventId?: string;
 };
 
 export type AdminBookingQuery = {

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * ID / HMO thumbnails and lightbox. Landscape crop in the table; zoom uses
+ * shrink-0 so the image actually enlarges. Admin cookie is not sent through
+ * next/image, so these are plain img tags on the authenticated file route.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminProof } from "@/admin/types";
 import type { DocumentKind } from "@/lib/booking/records";

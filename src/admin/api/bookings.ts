@@ -1,3 +1,7 @@
+/**
+ * Route handlers mounted at /api/v1/admin/bookings/*.
+ * Cookie auth first; then list / approve (invite) / reject / file download.
+ */
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/admin/auth";
 import { jsonError } from "@/admin/http";
@@ -10,6 +14,7 @@ import {
 } from "@/admin/service";
 import type { DocumentKind } from "@/lib/booking/records";
 
+/** Cookie-gated list used by the dashboard fetch. */
 export async function listBookings(request: Request) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
@@ -24,6 +29,7 @@ export async function listBookings(request: Request) {
   }
 }
 
+/** POST approve — invite then persist; failures stay pending. */
 export async function approveBooking(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -41,6 +47,7 @@ export async function approveBooking(
   }
 }
 
+/** POST reject — requires a short reason, no calendar event. */
 export async function rejectBooking(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -61,6 +68,7 @@ export async function rejectBooking(
   }
 }
 
+/** GET ID/HMO bytes for the lightbox (admin cookie required). */
 export async function bookingFile(
   _request: Request,
   context: { params: Promise<{ id: string; kind: string }> },

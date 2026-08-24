@@ -3,6 +3,8 @@ import { listBookings } from "@/lib/booking/store";
 import { StaffLoginForm } from "@/components/staff/staff-login-form";
 import { StaffQueue } from "@/components/staff/staff-queue";
 
+/** /staff — PIN gate, then the same pending bookings admin reviews. */
+
 export const metadata = {
   title: "Verification queue — Urban Smiles",
   robots: { index: false, follow: false },

@@ -1,3 +1,10 @@
+/**
+ * Admin cookie session (iron-session).
+ *
+ * Sign-in writes `authenticated` onto an httpOnly cookie named us_admin.
+ * Edge middleware in protect.ts reads the same seal, so login and route
+ * guards share one password (ADMIN_PASSWORD / ADMIN_SESSION_SECRET).
+ */
 import type { SessionOptions } from "iron-session";
 
 export const ADMIN_COOKIE = "us_admin";

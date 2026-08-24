@@ -1,5 +1,12 @@
 "use server";
 
+/**
+ * Public booking submit + staff PIN auth + staff review.
+ *
+ * submitAppointment stores pending_verification with ID/HMO files.
+ * Staff use STAFF_PIN (us_staff cookie). Approve still goes through
+ * approveBookingWithInvite so a failed calendar call leaves the row pending.
+ */
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -23,6 +30,8 @@ import {
   toStoredDocument,
   updateBookingStatus,
 } from "./store";
+import { approveBookingWithInvite } from "./approve";
+import { CalendarInviteError } from "@/lib/calendar/google";
 
 const STAFF_COOKIE = "us_staff";
 
@@ -40,12 +49,14 @@ function staffSecret() {
   return process.env.STAFF_PIN?.trim() || "";
 }
 
+/** SHA-256 of STAFF_PIN; compared to the us_staff cookie (not the PIN itself). */
 function staffToken() {
   const pin = staffSecret();
   if (!pin) return "";
   return createHash("sha256").update(`urban-smiles:${pin}`).digest("hex");
 }
 
+/** Front-desk queue at /staff — separate from the admin dashboard password. */
 export async function isStaffAuthenticated(): Promise<boolean> {
   const token = staffToken();
   if (!token) return false;
@@ -53,6 +64,7 @@ export async function isStaffAuthenticated(): Promise<boolean> {
   return jar.get(STAFF_COOKIE)?.value === token;
 }
 
+/** Sets the staff cookie when the PIN matches STAFF_PIN. */
 export async function loginStaff(
   _prev: { error?: string },
   formData: FormData,
@@ -79,6 +91,7 @@ export async function loginStaff(
   return {};
 }
 
+/** Clears the staff cookie. */
 export async function logoutStaff() {
   const jar = await cookies();
   jar.delete(STAFF_COOKIE);
@@ -93,6 +106,10 @@ function echoFrom(raw: Record<string, string | undefined>) {
   return values;
 }
 
+/**
+ * Validates FormData against appointmentSchema, stores ID/HMO blobs, and
+ * writes a pending_verification booking. Does not send a calendar invite.
+ */
 export async function submitAppointment(
   _prevState: AppointmentFormState,
   formData: FormData,
@@ -226,6 +243,10 @@ function createReference(appointment: AppointmentInput): string {
   return `US-${datePart}-${random}`;
 }
 
+/**
+ * Staff queue approve/reject. Approve uses the same invite-then-save path as
+ * /admin so a failed Calendar call leaves the request pending here too.
+ */
 export async function reviewBooking(
   _prev: { error?: string },
   formData: FormData,
@@ -245,7 +266,22 @@ export async function reviewBooking(
     return { error: "That booking is no longer in the queue." };
   }
 
-  await updateBookingStatus(reference, decision, note);
+  try {
+    if (decision === "approved") {
+      await approveBookingWithInvite(reference);
+    } else {
+      await updateBookingStatus(reference, decision, note);
+    }
+  } catch (error) {
+    if (error instanceof CalendarInviteError) {
+      return { error: error.message };
+    }
+    return {
+      error:
+        "The booking was left pending because the calendar invite could not be sent.",
+    };
+  }
+
   revalidatePath("/staff");
   return {};
 }

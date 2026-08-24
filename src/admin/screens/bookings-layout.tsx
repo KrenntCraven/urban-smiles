@@ -1,5 +1,7 @@
 import { logoutAdmin } from "@/admin/auth";
 
+/** Signed-in chrome: clinic name + Sign out. */
+
 export function AdminBookingsLayout({
   children,
 }: {
