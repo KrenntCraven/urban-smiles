@@ -13,18 +13,15 @@ import {
   LOCATIONS,
 } from "@/lib/booking/schema";
 import { approveBookingWithInvite } from "@/lib/booking/approve";
+import { rejectBookingWithNotice } from "@/lib/booking/reject";
 import { CalendarInviteError } from "@/lib/calendar/google";
+import { RejectEmailError } from "@/lib/email/resend";
 import type {
   BookingRecord,
   BookingStatus,
   DocumentKind,
 } from "@/lib/booking/records";
-import {
-  getBooking,
-  getDocument,
-  listBookings,
-  updateBookingStatus,
-} from "@/lib/booking/store";
+import { getBooking, getDocument, listBookings } from "@/lib/booking/store";
 import { supabaseConfigured } from "@/lib/supabase/admin";
 import { fetchFastApi, fetchFastApiFile } from "./fastapi";
 import { buildSearchIndex, matchesSearch } from "./search";
@@ -272,7 +269,7 @@ export async function approveAdminBooking(id: string): Promise<AdminBooking> {
   }
 }
 
-/** Reject does not touch Google Calendar — pending rows have no event yet. */
+/** Email the patient via Resend, then persist rejected. */
 export async function rejectAdminBooking(
   id: string,
   reason: string,
@@ -294,12 +291,16 @@ export async function rejectAdminBooking(
     return normalizeRemote(payload);
   }
 
-  const updated = await updateBookingStatus(id, "rejected", note);
-  if (!updated) {
-    throw new AdminServiceError("Booking not found.", 404);
+  try {
+    const updated = await rejectBookingWithNotice(id, note);
+    bumpAdminCaches();
+    return toAdminBooking(updated);
+  } catch (error) {
+    if (error instanceof RejectEmailError) {
+      throw new AdminServiceError(error.message, error.status);
+    }
+    throw error;
   }
-  bumpAdminCaches();
-  return toAdminBooking(updated);
 }
 
 export async function readAdminDocument(id: string, kind: DocumentKind) {

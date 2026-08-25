@@ -9,6 +9,7 @@ import { formatPatientName, getLocationName } from "@/lib/booking/schema";
 import type { AppointmentInput } from "@/lib/booking/schema";
 import type { FileBlob } from "@/lib/booking/blobs";
 import type { BookingRecord, DocumentKind } from "@/lib/booking/records";
+import { extensionForMime } from "@/lib/booking/files";
 import {
   createSupabaseAdmin,
   GOVERNMENT_ID_BUCKET,
@@ -61,21 +62,12 @@ export function bucketFor(kind: DocumentKind): string {
   return kind === "governmentId" ? GOVERNMENT_ID_BUCKET : HMO_ID_BUCKET;
 }
 
-function extension(mimeType: string, filename: string): string {
-  if (filename.includes(".")) {
-    return filename.slice(filename.lastIndexOf("."));
-  }
-  if (mimeType === "image/png") return ".png";
-  if (mimeType === "image/webp") return ".webp";
-  return ".jpg";
-}
-
 function storagePath(
   reference: string,
   kind: DocumentKind,
   blob: FileBlob,
 ): string {
-  return `${reference}/${kind}${extension(blob.mimeType, blob.filename)}`;
+  return `${reference}/${kind}${extensionForMime(blob.mimeType)}`;
 }
 
 function toRecord(row: BookingRow): BookingRecord {

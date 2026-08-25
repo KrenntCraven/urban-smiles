@@ -60,8 +60,8 @@ export function RejectDialog({
           Reject this request?
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          {patientName} will not be confirmed. Add a short reason for the
-          record.
+          {patientName} will receive an email with this reason. The visit will
+          not be held on the clinic calendar.
         </p>
         <label className="mt-5 block">
           <span className="mb-1.5 block text-sm font-medium text-ink">

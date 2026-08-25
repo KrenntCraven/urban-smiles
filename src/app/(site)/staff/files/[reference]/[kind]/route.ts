@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isStaffAuthenticated } from "@/lib/booking/actions";
 import type { DocumentKind } from "@/lib/booking/records";
+import { documentFileHeaders } from "@/lib/booking/files";
 import { getDocument } from "@/lib/booking/store";
 
 /** Authenticated staff download of a stored ID/HMO photo. */
@@ -28,10 +29,6 @@ export async function GET(
   if (!file) return new NextResponse("Not found", { status: 404 });
 
   return new NextResponse(Buffer.from(file.bytes), {
-    headers: {
-      "Content-Type": file.mimeType,
-      "Content-Disposition": `inline; filename="${file.filename}"`,
-      "Cache-Control": "private, no-store",
-    },
+    headers: documentFileHeaders(kind as DocumentKind, file),
   });
 }

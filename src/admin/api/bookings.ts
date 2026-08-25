@@ -13,6 +13,7 @@ import {
   rejectAdminBooking,
 } from "@/admin/service";
 import type { DocumentKind } from "@/lib/booking/records";
+import { documentFileHeaders } from "@/lib/booking/files";
 
 /** Cookie-gated list used by the dashboard fetch. */
 export async function listBookings(request: Request) {
@@ -85,11 +86,7 @@ export async function bookingFile(
     }
 
     return new NextResponse(Buffer.from(file.bytes), {
-      headers: {
-        "Content-Type": file.mimeType,
-        "Content-Disposition": `inline; filename="${file.filename}"`,
-        "Cache-Control": "private, no-store",
-      },
+      headers: documentFileHeaders(kind as DocumentKind, file),
     });
   } catch (error) {
     return jsonError(error);
