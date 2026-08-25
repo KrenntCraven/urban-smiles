@@ -9,7 +9,7 @@
  */
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   appointmentSchema,
   formatPatientName,
@@ -22,16 +22,14 @@ import {
 } from "./schema";
 import type { AppointmentFormState } from "./form-state";
 import { parseRequiredDocuments } from "./files";
+import { consumeBookingSubmitQuota, requestIp } from "./rate-limit";
 import { getServiceBySlug } from "@/lib/services/catalog";
 import { getDentistBySlug } from "@/lib/team/roster";
-import {
-  getBooking,
-  saveBooking,
-  toStoredDocument,
-  updateBookingStatus,
-} from "./store";
+import { getBooking, saveBooking, toStoredDocument } from "./store";
 import { approveBookingWithInvite } from "./approve";
+import { rejectBookingWithNotice } from "./reject";
 import { CalendarInviteError } from "@/lib/calendar/google";
+import { RejectEmailError } from "@/lib/email/resend";
 
 const STAFF_COOKIE = "us_staff";
 
@@ -198,6 +196,19 @@ export async function submitAppointment(
     };
   }
 
+  const quota = consumeBookingSubmitQuota({
+    ip: requestIp(await headers()),
+    email: parsed.data.email,
+  });
+  if (!quota.ok) {
+    return {
+      status: "error",
+      fieldErrors: {},
+      formError: `Too many booking requests from this connection. Try again in ${quota.retryMinutes} minute${quota.retryMinutes === 1 ? "" : "s"}.`,
+      values: echo,
+    };
+  }
+
   const reference = createReference(parsed.data);
   const stored = Object.entries(documents.documents).map(([kind, blob]) =>
     toStoredDocument(kind as keyof typeof documents.documents, blob!),
@@ -244,8 +255,8 @@ function createReference(appointment: AppointmentInput): string {
 }
 
 /**
- * Staff queue approve/reject. Approve uses the same invite-then-save path as
- * /admin so a failed Calendar call leaves the request pending here too.
+ * Staff queue approve/reject. Approve sends the calendar invite first;
+ * reject emails the patient via Resend first. Either failure leaves pending.
  */
 export async function reviewBooking(
   _prev: { error?: string },
@@ -270,10 +281,13 @@ export async function reviewBooking(
     if (decision === "approved") {
       await approveBookingWithInvite(reference);
     } else {
-      await updateBookingStatus(reference, decision, note);
+      await rejectBookingWithNotice(reference, note ?? "");
     }
   } catch (error) {
-    if (error instanceof CalendarInviteError) {
+    if (
+      error instanceof CalendarInviteError ||
+      error instanceof RejectEmailError
+    ) {
       return { error: error.message };
     }
     return {

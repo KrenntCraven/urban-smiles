@@ -1,12 +1,21 @@
 /**
  * Google Calendar API adapter used when a booking is approved.
  *
- * Flow: service account JWT → events.insert (with sendUpdates) → event id.
- * Gmail guests only receive the invite if GOOGLE_CALENDAR_IMPERSONATE is a
- * Workspace user with domain-wide delegation; a bare service account can
- * write the clinic calendar but often cannot email attendees.
+ * Flow: auth → events.insert (with sendUpdates) → event id.
+ *
+ * Auth has two shapes and OAuth wins when both are present:
+ *  - OAuth refresh token for the clinic Gmail. Calendar treats the call as
+ *    that user, so attendees are allowed and guests are emailed. Mint the
+ *    token with `npm run calendar:auth`.
+ *  - Service account JWT. Fine for writing the calendar, but Google rejects
+ *    `attendees` with "Service accounts cannot invite attendees without
+ *    Domain-Wide Delegation of Authority" unless GOOGLE_CALENDAR_IMPERSONATE
+ *    names a Workspace user with domain-wide delegation.
  */
 import { google, type calendar_v3 } from "googleapis";
+
+/** Write access plus the ability to email guests on insert. */
+export const CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
 /** Thrown instead of approving when Google Calendar is missing or the insert fails. */
 export class CalendarInviteError extends Error {
@@ -51,29 +60,67 @@ function serviceAccount(): ServiceAccount | undefined {
   return undefined;
 }
 
-/** Clinic calendar the service account must already be able to write. */
+type OAuthCredentials = {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+};
+
+/** Reads the clinic Gmail OAuth trio minted by `npm run calendar:auth`. */
+function oauthCredentials(): OAuthCredentials | undefined {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN?.trim();
+  if (!clientId || !clientSecret || !refreshToken) return undefined;
+  return { clientId, clientSecret, refreshToken };
+}
+
+/** Clinic calendar the credentials must already be able to write. */
 export function googleCalendarId(): string | undefined {
   return process.env.GOOGLE_CALENDAR_ID?.trim() || undefined;
 }
 
-/** True when both a service account and GOOGLE_CALENDAR_ID are present. */
+/** True when GOOGLE_CALENDAR_ID plus either credential shape are present. */
 export function calendarConfigured(): boolean {
-  return Boolean(serviceAccount() && googleCalendarId());
+  return Boolean(
+    (oauthCredentials() || serviceAccount()) && googleCalendarId(),
+  );
 }
 
 /**
- * Builds a Calendar API client. `subject` impersonates the clinic Gmail so
- * guest invites actually land in the patient's inbox.
+ * Builds a Calendar API client. OAuth acts as the clinic Gmail itself, which
+ * is what lets the insert carry attendees; the service account path only
+ * reaches guests when `subject` impersonates a delegated Workspace user.
  */
 function calendarClient(): {
   calendar: calendar_v3.Calendar;
   calendarId: string;
 } {
-  const account = serviceAccount();
   const calendarId = googleCalendarId();
-  if (!account || !calendarId) {
+  if (!calendarId) {
     throw new CalendarInviteError(
-      "Google Calendar is not configured. Set GOOGLE_CALENDAR_ID and the service account before approving.",
+      "Google Calendar is not configured. Set GOOGLE_CALENDAR_ID before approving.",
+      503,
+    );
+  }
+
+  const oauth = oauthCredentials();
+  if (oauth) {
+    const auth = new google.auth.OAuth2({
+      clientId: oauth.clientId,
+      clientSecret: oauth.clientSecret,
+    });
+    auth.setCredentials({ refresh_token: oauth.refreshToken });
+    return {
+      calendar: google.calendar({ version: "v3", auth }),
+      calendarId,
+    };
+  }
+
+  const account = serviceAccount();
+  if (!account) {
+    throw new CalendarInviteError(
+      "Google Calendar has no credentials. Run `npm run calendar:auth`, or set the service account, before approving.",
       503,
     );
   }
@@ -81,7 +128,7 @@ function calendarClient(): {
   const auth = new google.auth.JWT({
     email: account.client_email,
     key: account.private_key,
-    scopes: ["https://www.googleapis.com/auth/calendar"],
+    scopes: CALENDAR_SCOPES,
     subject: process.env.GOOGLE_CALENDAR_IMPERSONATE?.trim() || undefined,
   });
 
@@ -105,6 +152,15 @@ function googleMessage(error: unknown): string {
   );
 }
 
+/**
+ * Google's attendee refusal reads as a permissions bug, so name the fix:
+ * this deployment is still on the service account, not the clinic Gmail.
+ */
+function withCalendarHint(message: string): string {
+  if (!message.includes("Domain-Wide Delegation")) return message;
+  return `${message} Run \`npm run calendar:auth\` and set GOOGLE_OAUTH_* so invites are sent as the clinic Gmail.`;
+}
+
 /** Rate limits and 5xx are worth one retry; 401/403 are configuration bugs. */
 function isRetryable(error: unknown): boolean {
   const status = (error as { code?: number; response?: { status?: number } })
@@ -121,7 +177,7 @@ async function withRetry<T>(run: () => Promise<T>): Promise<T> {
   } catch (error) {
     if (!isRetryable(error)) {
       throw new CalendarInviteError(
-        `Could not send the Google Calendar invite: ${googleMessage(error)}`,
+        `Could not send the Google Calendar invite: ${withCalendarHint(googleMessage(error))}`,
         502,
       );
     }
@@ -130,7 +186,7 @@ async function withRetry<T>(run: () => Promise<T>): Promise<T> {
       return await run();
     } catch (retryError) {
       throw new CalendarInviteError(
-        `Could not send the Google Calendar invite after retry: ${googleMessage(retryError)}`,
+        `Could not send the Google Calendar invite after retry: ${withCalendarHint(googleMessage(retryError))}`,
         502,
         true,
       );

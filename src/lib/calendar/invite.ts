@@ -1,15 +1,17 @@
 /**
  * Turns a booking into a Google Calendar event payload.
  *
- * Guest email is the address the patient typed (normalised like Gmail:
- * trimmed, lowercased). Their legal name is the attendee displayName and
- * also the start of the event title so the invite in Gmail reads as
- * "Name — Service" rather than a bare clinic calendar block.
+ * The invite is a clinic appointment, not a patient record: title, time,
+ * branch, and address only. Phone, notes, name, and the booking reference
+ * stay in admin. The guest list still uses the patient's email so Gmail can
+ * deliver the invite; displayName is omitted so that name is not copied into
+ * Google's event body.
  */
 import {
   emailError,
-  formatPatientName,
+  getLocationAddress,
   getLocationName,
+  getLocationShortName,
 } from "@/lib/booking/schema";
 import type { BookingRecord } from "@/lib/booking/records";
 import { getServiceBySlug } from "@/lib/services/catalog";
@@ -56,10 +58,21 @@ function chairMinutes(slug: string): number {
   return service?.duration.maxMinutes ?? 60;
 }
 
-/** Event body sent to events.insert: title, branch as location, guest with name. */
+/** Google renders a small HTML subset here; anything else must be escaped. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function detailRow(label: string, value: string): string {
+  return `<b>${label}:</b> ${escapeHtml(value)}`;
+}
+
+/** Event body sent to events.insert: clinic title, branch location, guest email. */
 export function buildCalendarEvent(record: BookingRecord) {
   const { appointment } = record;
-  const patientName = formatPatientName(appointment);
   const service = getServiceBySlug(appointment.serviceSlug);
   const serviceName = service?.name ?? appointment.serviceSlug;
   const duration = service?.duration ?? {
@@ -70,6 +83,8 @@ export function buildCalendarEvent(record: BookingRecord) {
   const minutes = chairMinutes(appointment.serviceSlug);
   const branch =
     getLocationName(appointment.locationId) ?? appointment.locationId;
+  const branchShort = getLocationShortName(appointment.locationId) ?? branch;
+  const address = getLocationAddress(appointment.locationId);
   const email = gmailInviteAddress(appointment.email);
   const end = addClinicMinutes(
     appointment.preferredDate,
@@ -78,18 +93,20 @@ export function buildCalendarEvent(record: BookingRecord) {
   );
 
   return {
-    summary: `${patientName} — ${serviceName}`,
+    summary: `Urban Smiles ${branchShort} — ${serviceName}`,
     description: [
-      "Urban Smiles appointment",
-      `Patient: ${patientName}`,
-      `Service: ${serviceName} (${formatDuration(duration)})`,
-      `Branch: ${branch}`,
-      `Reference: ${record.reference}`,
-      `Mobile: ${appointment.phone}`,
-      ...(appointment.notes ? [`Notes: ${appointment.notes}`] : []),
-      "Please RSVP on this Google Calendar invite in Gmail so the clinic knows you received it.",
-    ].join("\n"),
-    location: branch,
+      `<b>Urban Smiles ${escapeHtml(branchShort)}</b><br>`,
+      "Your appointment is confirmed. Please arrive 10 minutes early.<br>",
+      "<br>",
+      detailRow("Service", `${serviceName} (${formatDuration(duration)})`),
+      "<br>",
+      detailRow("Branch", branch),
+      ...(address ? ["<br>", detailRow("Address", address)] : []),
+      "<br><br>",
+      "Reply <b>Yes</b> on this invite so the clinic knows you received it. ",
+      "To reschedule or cancel, call the branch at least 24 hours ahead.",
+    ].join(""),
+    location: address ? `Urban Smiles ${branchShort}, ${address}` : branch,
     start: {
       dateTime: `${appointment.preferredDate}T${appointment.preferredTime}:00`,
       timeZone: CLINIC_TZ,
@@ -101,7 +118,6 @@ export function buildCalendarEvent(record: BookingRecord) {
     attendees: [
       {
         email,
-        displayName: patientName,
         responseStatus: "needsAction" as const,
       },
     ],

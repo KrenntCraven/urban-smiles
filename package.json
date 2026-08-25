@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "setup:supabase": "npx tsx scripts/setup-supabase.ts"
+    "setup:supabase": "npx tsx scripts/setup-supabase.ts",
+    "calendar:auth": "npx tsx scripts/google-calendar-auth.ts",
+    "calendar:check": "npx tsx scripts/calendar-check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -19,6 +21,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.86.0",
+    "resend": "^6.22.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

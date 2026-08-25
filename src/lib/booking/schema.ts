@@ -8,11 +8,31 @@ import { z } from "zod";
  * Covers visit (service, branch, date/time), identity (Pascal-case names),
  * PH mobile + email, HMO vs self-pay, and privacy consent.
  */
+/** `address` is what calendar invites and maps resolve, so keep it geocodable. */
 export const LOCATIONS = [
-  { id: "bgc", name: "BGC — High Street" },
-  { id: "makati", name: "Makati — Legazpi Village" },
-  { id: "ortigas", name: "Ortigas — Emerald Avenue" },
-  { id: "qc", name: "Quezon City — Katipunan" },
+  {
+    id: "bgc",
+    name: "BGC — High Street",
+    address:
+      "2F Bonifacio High Street, 9th Avenue corner 30th Street, Taguig, Metro Manila",
+  },
+  {
+    id: "makati",
+    name: "Makati — Legazpi Village",
+    address:
+      "Ground Floor, 108 Rufino Street, Legazpi Village, Makati, Metro Manila",
+  },
+  {
+    id: "ortigas",
+    name: "Ortigas — Emerald Avenue",
+    address: "5F Emerald Avenue, Ortigas Center, Pasig, Metro Manila",
+  },
+  {
+    id: "qc",
+    name: "Quezon City — Katipunan",
+    address:
+      "Unit 3, Katipunan Avenue, Loyola Heights, Quezon City, Metro Manila",
+  },
 ] as const;
 
 export type LocationId = (typeof LOCATIONS)[number]["id"];
@@ -287,6 +307,17 @@ export function buildQuickBookingHref(prefill: BookingPrefill): string {
 
 export function getLocationName(id: string | undefined): string | undefined {
   return LOCATIONS.find((location) => location.id === id)?.name;
+}
+
+export function getLocationAddress(id: string | undefined): string | undefined {
+  return LOCATIONS.find((location) => location.id === id)?.address;
+}
+
+/** "BGC" from "BGC — High Street", for titles that already say Urban Smiles. */
+export function getLocationShortName(
+  id: string | undefined,
+): string | undefined {
+  return getLocationName(id)?.split(" — ")[0];
 }
 
 export function formatPatientName(

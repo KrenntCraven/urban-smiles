@@ -112,7 +112,7 @@ function ReviewActions({ reference }: { reference: string }) {
       <input type="hidden" name="reference" value={reference} />
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-ink">
-          Note to patient (optional)
+          Reason (required to reject)
         </span>
         <input
           type="text"
