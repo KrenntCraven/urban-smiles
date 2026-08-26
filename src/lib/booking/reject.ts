@@ -1,17 +1,14 @@
 /**
  * Reject path shared by /admin and /staff.
  *
- * Email first, then persist "rejected". If Resend fails the row stays pending
+ * Email first, then persist "rejected". If Gmail fails the row stays pending
  * so the desk can fix the reason or the mail config and try again.
  */
 import type { BookingRecord } from "./records";
 import { emailError, formatPatientName } from "./schema";
 import { getBooking, updateBookingStatus } from "./store";
-import {
-  RejectEmailError,
-  rejectEmailConfigured,
-  sendResendEmail,
-} from "@/lib/email/resend";
+import { RejectEmailError } from "@/lib/email/errors";
+import { clinicMailConfigured, sendClinicEmail } from "@/lib/email/gmail";
 import {
   rejectEmailHtml,
   rejectEmailSubject,
@@ -33,9 +30,9 @@ export async function rejectBookingWithNotice(
   }
   if (current.status === "rejected") return current;
 
-  if (!rejectEmailConfigured()) {
+  if (!clinicMailConfigured()) {
     throw new RejectEmailError(
-      "Resend is not configured. Set RESEND_API_KEY and RESEND_FROM before rejecting.",
+      "Clinic mail is not configured. Run `npm run calendar:auth` and set GOOGLE_OAUTH_* plus GOOGLE_CALENDAR_ID before rejecting.",
       503,
     );
   }
@@ -48,7 +45,7 @@ export async function rejectBookingWithNotice(
     );
   }
 
-  await sendResendEmail({
+  await sendClinicEmail({
     to,
     subject: rejectEmailSubject(current),
     html: rejectEmailHtml(current, note),
