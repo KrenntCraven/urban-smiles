@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { AdminServiceError } from "./service";
 import { FastApiError } from "./fastapi";
 import { CalendarInviteError } from "@/lib/calendar/google";
-import { RejectEmailError } from "@/lib/email/resend";
+import { RejectEmailError } from "@/lib/email/errors";
 
 /** Maps known admin/calendar errors to `{ detail }` JSON; logs anything else. */
 export function jsonError(error: unknown) {

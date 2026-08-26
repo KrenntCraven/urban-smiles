@@ -15,7 +15,7 @@ import {
 import { approveBookingWithInvite } from "@/lib/booking/approve";
 import { rejectBookingWithNotice } from "@/lib/booking/reject";
 import { CalendarInviteError } from "@/lib/calendar/google";
-import { RejectEmailError } from "@/lib/email/resend";
+import { RejectEmailError } from "@/lib/email/errors";
 import type {
   BookingRecord,
   BookingStatus,
@@ -269,7 +269,7 @@ export async function approveAdminBooking(id: string): Promise<AdminBooking> {
   }
 }
 
-/** Email the patient via Resend, then persist rejected. */
+/** Email the patient from the clinic Gmail, then persist rejected. */
 export async function rejectAdminBooking(
   id: string,
   reason: string,

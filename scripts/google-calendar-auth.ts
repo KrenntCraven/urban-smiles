@@ -1,6 +1,6 @@
 /**
  * One-time consent flow that mints GOOGLE_OAUTH_REFRESH_TOKEN for the clinic
- * Gmail, so calendar invites are created as that user and guests are emailed.
+ * Gmail, so calendar invites and rejection mail are sent as that user.
  *
  * Sign in as the GOOGLE_CALENDAR_ID account when the browser opens. The token
  * is written back into .env.local; copy it to Vercel yourself.
@@ -9,7 +9,7 @@ import { createServer } from "node:http";
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { google } from "googleapis";
-import { CALENDAR_SCOPES } from "../src/lib/calendar/google";
+import { CLINIC_OAUTH_SCOPES } from "../src/lib/google/oauth";
 
 const ENV_PATH = ".env.local";
 
@@ -51,7 +51,7 @@ const oauth = new google.auth.OAuth2({
 const authUrl = oauth.generateAuthUrl({
   access_type: "offline",
   prompt: "consent",
-  scope: CALENDAR_SCOPES,
+  scope: CLINIC_OAUTH_SCOPES,
 });
 
 /** Rewrites the single key in place so the rest of .env.local is untouched. */
@@ -83,7 +83,7 @@ async function main() {
       response.writeHead(200, { "content-type": "text/plain" });
       response.end(
         received
-          ? "Urban Smiles calendar connected. You can close this tab."
+          ? "Urban Smiles calendar and mail connected. You can close this tab."
           : `Consent failed: ${error}`,
       );
       server.close();

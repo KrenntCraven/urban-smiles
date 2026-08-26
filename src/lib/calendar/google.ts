@@ -6,16 +6,21 @@
  * Auth has two shapes and OAuth wins when both are present:
  *  - OAuth refresh token for the clinic Gmail. Calendar treats the call as
  *    that user, so attendees are allowed and guests are emailed. Mint the
- *    token with `npm run calendar:auth`.
+ *    token with `npm run calendar:auth` (calendar + gmail.send).
  *  - Service account JWT. Fine for writing the calendar, but Google rejects
  *    `attendees` with "Service accounts cannot invite attendees without
  *    Domain-Wide Delegation of Authority" unless GOOGLE_CALENDAR_IMPERSONATE
  *    names a Workspace user with domain-wide delegation.
  */
 import { google, type calendar_v3 } from "googleapis";
+import {
+  CALENDAR_SCOPE,
+  clinicOAuthClient,
+  oauthCredentials,
+} from "@/lib/google/oauth";
 
-/** Write access plus the ability to email guests on insert. */
-export const CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"];
+/** Write access plus the ability to email guests on insert. JWT path only. */
+export const CALENDAR_SCOPES = [CALENDAR_SCOPE];
 
 /** Thrown instead of approving when Google Calendar is missing or the insert fails. */
 export class CalendarInviteError extends Error {
@@ -60,21 +65,6 @@ function serviceAccount(): ServiceAccount | undefined {
   return undefined;
 }
 
-type OAuthCredentials = {
-  clientId: string;
-  clientSecret: string;
-  refreshToken: string;
-};
-
-/** Reads the clinic Gmail OAuth trio minted by `npm run calendar:auth`. */
-function oauthCredentials(): OAuthCredentials | undefined {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
-  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN?.trim();
-  if (!clientId || !clientSecret || !refreshToken) return undefined;
-  return { clientId, clientSecret, refreshToken };
-}
-
 /** Clinic calendar the credentials must already be able to write. */
 export function googleCalendarId(): string | undefined {
   return process.env.GOOGLE_CALENDAR_ID?.trim() || undefined;
@@ -104,13 +94,8 @@ function calendarClient(): {
     );
   }
 
-  const oauth = oauthCredentials();
-  if (oauth) {
-    const auth = new google.auth.OAuth2({
-      clientId: oauth.clientId,
-      clientSecret: oauth.clientSecret,
-    });
-    auth.setCredentials({ refresh_token: oauth.refreshToken });
+  const auth = clinicOAuthClient();
+  if (auth) {
     return {
       calendar: google.calendar({ version: "v3", auth }),
       calendarId,
@@ -125,7 +110,7 @@ function calendarClient(): {
     );
   }
 
-  const auth = new google.auth.JWT({
+  const jwt = new google.auth.JWT({
     email: account.client_email,
     key: account.private_key,
     scopes: CALENDAR_SCOPES,
@@ -133,7 +118,7 @@ function calendarClient(): {
   });
 
   return {
-    calendar: google.calendar({ version: "v3", auth }),
+    calendar: google.calendar({ version: "v3", auth: jwt }),
     calendarId,
   };
 }

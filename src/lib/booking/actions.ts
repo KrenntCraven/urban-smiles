@@ -29,7 +29,7 @@ import { getBooking, saveBooking, toStoredDocument } from "./store";
 import { approveBookingWithInvite } from "./approve";
 import { rejectBookingWithNotice } from "./reject";
 import { CalendarInviteError } from "@/lib/calendar/google";
-import { RejectEmailError } from "@/lib/email/resend";
+import { RejectEmailError } from "@/lib/email/errors";
 
 const STAFF_COOKIE = "us_staff";
 
@@ -256,7 +256,7 @@ function createReference(appointment: AppointmentInput): string {
 
 /**
  * Staff queue approve/reject. Approve sends the calendar invite first;
- * reject emails the patient via Resend first. Either failure leaves pending.
+ * reject emails the patient from the clinic Gmail first. Either failure leaves pending.
  */
 export async function reviewBooking(
   _prev: { error?: string },

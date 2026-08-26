@@ -4,7 +4,7 @@
  */
 import { readFileSync } from "node:fs";
 import { google } from "googleapis";
-import { CALENDAR_SCOPES } from "../src/lib/calendar/google";
+import { CLINIC_OAUTH_SCOPES } from "../src/lib/google/oauth";
 
 for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
   const match = /^([A-Z_]+)=(.*)$/.exec(line.trim());
@@ -40,7 +40,11 @@ async function main() {
   const calendar = google.calendar({ version: "v3", auth });
   const token = await auth.getAccessToken();
   console.log(`access token: ${token.token ? "granted" : "refused"}`);
-  console.log(`scopes requested: ${CALENDAR_SCOPES.join(", ")}`);
+  console.log(`scopes requested: ${CLINIC_OAUTH_SCOPES.join(", ")}`);
+  if (token.token) {
+    const info = await auth.getTokenInfo(token.token);
+    console.log(`scopes granted: ${info.scopes ?? "(unknown)"}`);
+  }
 
   const found = await calendar.calendars.get({ calendarId });
   console.log(`calendar reachable as: ${found.data.summary ?? calendarId}`);

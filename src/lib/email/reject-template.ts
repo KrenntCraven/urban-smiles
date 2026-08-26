@@ -56,7 +56,7 @@ export function rejectEmailSubject(record: BookingRecord): string {
   return `Urban Smiles — we could not confirm your ${service} request`;
 }
 
-/** Full HTML document Resend sends as `html`. */
+/** Full HTML document Gmail sends as `html`. */
 export function rejectEmailHtml(record: BookingRecord, reason: string): string {
   const first = escapeHtml(record.appointment.firstName);
   const patient = escapeHtml(formatPatientName(record.appointment));
