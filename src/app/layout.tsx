@@ -18,7 +18,11 @@ export const metadata: Metadata = {
     "Comprehensive, gentle dental care designed around your comfort, health, and confidence.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"
