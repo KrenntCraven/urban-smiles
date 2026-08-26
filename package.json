@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "setup:supabase": "npx tsx scripts/setup-supabase.ts",
     "calendar:auth": "npx tsx scripts/google-calendar-auth.ts",
     "calendar:check": "npx tsx scripts/calendar-check.ts",
